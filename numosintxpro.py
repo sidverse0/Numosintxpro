@@ -1,13 +1,12 @@
 import os
 import logging
 import re
+import json
 from flask import Flask, request
 import telegram
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputFile
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
 import requests
-import json
-import html
 
 # Bot configuration
 BOT_TOKEN = os.environ.get('BOT_TOKEN', '8361713613:AAEB7P0RTnb0gkBiW-MoV1Ce_35bKKW5w5E')
@@ -75,6 +74,35 @@ def format_address(address):
     formatted = re.sub(r'\s+', ' ', formatted)
     return formatted.strip()
 
+def safe_json_parse(response_text):
+    """Safely parse JSON response and handle errors"""
+    try:
+        # First try direct JSON parsing
+        return json.loads(response_text)
+    except json.JSONDecodeError as e:
+        logger.error(f"JSON parse error: {e}")
+        
+        # Try to fix common JSON issues
+        try:
+            # Remove extra data after the main JSON
+            if '}{' in response_text:
+                # Take only the first JSON object
+                response_text = response_text.split('}{')[0] + '}'
+            
+            # Try to find valid JSON structure
+            start_idx = response_text.find('{')
+            end_idx = response_text.rfind('}') + 1
+            
+            if start_idx != -1 and end_idx != 0:
+                cleaned_json = response_text[start_idx:end_idx]
+                return json.loads(cleaned_json)
+            else:
+                return {"error": "Invalid JSON response from API"}
+                
+        except Exception as e2:
+            logger.error(f"JSON cleanup failed: {e2}")
+            return {"error": f"JSON parsing failed: {str(e2)}"}
+
 def get_unique_results(data):
     """Get unique results based on mobile and name combination"""
     if not data or 'data' not in data:
@@ -103,7 +131,6 @@ def start(update: Update, context: CallbackContext) -> None:
     """Send welcome message with inline keyboard"""
     keyboard = [
         [InlineKeyboardButton("📱 Phone Search", callback_data='search_phone')],
-        [InlineKeyboardButton("🔍 Number Lookup", callback_data='search_phone')],
         [InlineKeyboardButton("ℹ️ Help", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -157,7 +184,7 @@ def button_handler(update: Update, context: CallbackContext) -> None:
 • 👤 Name & Family Details
 • 🏠 Complete Address
 • 📞 Alternative Numbers
-• 🎯 Only 2 unique results (no duplicates)
+• 🎯 Only 2 unique results
         """
         query.edit_message_text(
             help_text,
@@ -168,16 +195,27 @@ def button_handler(update: Update, context: CallbackContext) -> None:
         )
 
 def get_phone_info(phone_number):
-    """Fetch phone information from API"""
+    """Fetch phone information from API with better error handling"""
     try:
         response = requests.get(f"{PHONE_API_URL}{phone_number}", timeout=15)
-        if response.status_code == 200:
-            data = response.json()
-            return data
-        else:
+        
+        if response.status_code != 200:
             return {"error": f"API returned status code: {response.status_code}"}
+        
+        # Use safe JSON parsing
+        data = safe_json_parse(response.text)
+        
+        if 'error' in data:
+            return data
+            
+        return data
+        
+    except requests.exceptions.Timeout:
+        return {"error": "API request timeout"}
+    except requests.exceptions.ConnectionError:
+        return {"error": "Connection error - please try again"}
     except Exception as e:
-        return {"error": f"API Error: {str(e)}"}
+        return {"error": f"Request failed: {str(e)}"}
 
 def format_phone_result(result, result_number):
     """Format single phone result with emojis"""
@@ -213,14 +251,19 @@ def format_phone_results(phone_number, data):
         message += f"❌ *Error:* {escape_markdown(data['error'])}\n"
         return message
     
+    if not data.get('data'):
+        message += "❌ *No data found for this number*\n\n"
+        message += "*Possible reasons:*\n"
+        message += "• Number not in database\n"
+        message += "• Try different number\n"
+        message += "• Number might be new/unregistered\n"
+        return message
+    
     unique_results = get_unique_results(data)
     
     if not unique_results:
         message += "❌ *No unique results found*\n\n"
-        message += "Possible reasons:\n"
-        message += "• Number not in database\n"
-        message += "• Try different number\n"
-        message += "• Server temporary issue\n"
+        message += "All results were duplicates\n"
         return message
     
     # Add result count info
@@ -335,7 +378,6 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
         # Create keyboard for new search
         keyboard = [
             [InlineKeyboardButton("🔄 Search Again", callback_data='search_phone')],
-            [InlineKeyboardButton("📱 New Number", callback_data='search_phone')],
             [InlineKeyboardButton("🏠 Home", callback_data='home')]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -362,7 +404,8 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
                 )
         
     except Exception as e:
-        error_text = f"❌ *Error occurred\\!*\n\nPlease try again later\\.\n\n⚡ Error: {escape_markdown(str(e))}"
+        logger.error(f"Unexpected error: {e}")
+        error_text = f"❌ *Unexpected Error\\!*\n\nPlease try again later\\.\n\n⚡ Error: {escape_markdown(str(e))}"
         context.bot.edit_message_text(
             chat_id=processing_msg.chat_id,
             message_id=processing_msg.message_id,
@@ -380,7 +423,6 @@ def home_handler(update: Update, context: CallbackContext) -> None:
     
     keyboard = [
         [InlineKeyboardButton("📱 Phone Search", callback_data='search_phone')],
-        [InlineKeyboardButton("🔍 Number Lookup", callback_data='search_phone')],
         [InlineKeyboardButton("ℹ️ Help", callback_data='help')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
