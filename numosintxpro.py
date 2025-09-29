@@ -364,10 +364,11 @@ def webhook():
 @app.route('/set_webhook', methods=['GET'])
 def set_webhook():
     """Set Telegram webhook (run this once)"""
-    webhook_url = "https://your-render-app-url.onrender.com/webhook"
+    webhook_url = "https://numosintxpro.onrender.com/webhook"
     response = requests.post(f"{TELEGRAM_API_URL}/setWebhook", 
                            json={'url': webhook_url})
     return response.json()
 
 if __name__ == '__main__':
+
     app.run(host='0.0.0.0', port=PORT, debug=False)
