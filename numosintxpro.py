@@ -266,10 +266,10 @@ def send_help_message(chat_id):
 1️⃣ **Click** *"Phone Search"* button
 2️⃣ **Enter** 10-digit phone number in *any format*:
    📝 Examples:
-   • `9525416052`
-   • `91 9525 416052`  
-   • `+919525416052`
-   • `09525416052`
+   • `7253715117`
+   • `91 0000 000000`  
+   • `+910000000000`
+   • `09999711627`
 3️⃣ **Receive** detailed intelligence report
 
 ⚡ **Smart Features:**
@@ -332,11 +332,11 @@ def send_search_prompt(chat_id):
 Please enter the 10-digit phone number you want to investigate:
 
 📝 **Format Examples:**
-• `9525416052`
-• `9142647694`  
-• `9876543210`
-• `91 9525 416052`
-• `+919525416052`
+
+   • `7253715117`
+   • `91 0000 000000`  
+   • `+910000000000`
+   • `09999711627`
 
 💡 **Tip:** You can enter the number in any format - I'll automatically clean it up!
     """
@@ -370,9 +370,11 @@ Please wait while I gather comprehensive intelligence...
 📋 **Please enter a valid 10-digit phone number:**
 
 💡 **Examples:**
-• `9525416052`
-• `9142647694`
-• `9876543210`
+ 📝 Examples:
+   • `7253715117`
+   • `91 0000 000000`  
+   • `+910000000000`
+   • `09999711627`
         """
         send_telegram_message(chat_id, error_text, 'Markdown')
         return
@@ -513,4 +515,5 @@ def set_webhook():
     return response.json()
 
 if __name__ == '__main__':
+
     app.run(host='0.0.0.0', port=PORT, debug=False)
