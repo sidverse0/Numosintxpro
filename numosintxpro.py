@@ -3,13 +3,11 @@ import logging
 import re
 import json
 import requests
-from flask import Flask, request
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
 # Bot configuration
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8361713613:AAEB7P0RTnb0gkBiW-MoV1Ce_35bKKW5w5E')
-PORT = int(os.environ.get('PORT', 5000))
-
-app = Flask(__name__)
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8116705267:AAHuwa5tUK2sErOtTf64StZ4STOQUv2Abp4')
 
 # Enable logging
 logging.basicConfig(
@@ -18,9 +16,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# API endpoints
+# API endpoint
 PHONE_API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
-TELEGRAM_API_URL = f"https://api.telegram.org/bot{BOT_TOKEN}"
 
 def normalize_phone_number(phone_number):
     """Normalize phone number to 10 digits"""
@@ -65,9 +62,7 @@ def safe_json_parse(response_text):
         return json.loads(response_text)
     except json.JSONDecodeError:
         try:
-            if '}{' in response_text:
-                response_text = response_text.split('}{')[0] + '}'
-            
+            # Try to extract JSON from response
             start_idx = response_text.find('{')
             end_idx = response_text.rfind('}') + 1
             
@@ -107,12 +102,15 @@ def get_all_relevant_results(data, searched_number):
 def get_phone_info(phone_number):
     """Fetch phone information from API"""
     try:
+        logger.info(f"Fetching info for number: {phone_number}")
         response = requests.get(f"{PHONE_API_URL}{phone_number}", timeout=15)
+        logger.info(f"API Response status: {response.status_code}")
         
         if response.status_code != 200:
             return {"error": f"API returned status code: {response.status_code}"}
         
         data = safe_json_parse(response.text)
+        logger.info(f"Parsed data keys: {list(data.keys()) if data else 'No data'}")
         return data
         
     except requests.exceptions.Timeout:
@@ -191,85 +189,51 @@ def format_phone_results(searched_number, data):
     
     return message
 
-def split_long_message(message, max_length=4096):
-    """Split long messages into multiple parts"""
-    if len(message) <= max_length:
-        return [message]
-    
-    parts = []
-    while len(message) > max_length:
-        # Find the last newline before max_length
-        split_index = message.rfind('\n', 0, max_length)
-        if split_index == -1:
-            split_index = max_length
-        
-        parts.append(message[:split_index])
-        message = message[split_index:].lstrip()
-    
-    if message:
-        parts.append(message)
-    
-    return parts
-
-def send_telegram_message(chat_id, text, parse_mode='MarkdownV2', reply_markup=None):
-    """Send message to Telegram using direct API call"""
-    url = f"{TELEGRAM_API_URL}/sendMessage"
-    payload = {
-        'chat_id': chat_id,
-        'text': text,
-        'parse_mode': parse_mode
-    }
-    
-    if reply_markup:
-        payload['reply_markup'] = json.dumps(reply_markup)
-    
-    try:
-        response = requests.post(url, json=payload, timeout=10)
-        return response.json()
-    except Exception as e:
-        logger.error(f"Error sending message: {e}")
-        return None
-
-def send_welcome_message(chat_id):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send welcome message with beautiful inline keyboard"""
-    keyboard = {
-        'inline_keyboard': [
-            [{'text': '🔍 Phone Search', 'callback_data': 'search_phone'}],
-            [{'text': 'ℹ️ Help Guide', 'callback_data': 'help'}],
-            [{'text': '📊 About Bot', 'callback_data': 'about'}]
-        ]
-    }
+    keyboard = [
+        [InlineKeyboardButton("🔍 Phone Search", callback_data='search_phone')],
+        [InlineKeyboardButton("ℹ️ Help Guide", callback_data='help')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
     welcome_text = """
 🎯 **Welcome to Phone Intelligence Bot** 🔍
 
-I'm your advanced phone number analysis assistant! I can help you uncover detailed information about any phone number with precision and speed.
+I can help you get detailed information about any phone number with precision and speed.
 
-✨ **Premium Features:**
+✨ **Features:**
 • 👨‍💼 Name & Family Details
 • 🏡 Complete Address Information  
 • 📞 Alternative Contact Numbers
 • 🌍 Telecom Circle & Operator
-• 🆔 Unique Identification Data
-• 📧 Email Addresses (if available)
 
 🚀 **Get started by clicking the search button below!**
     """
     
-    return send_telegram_message(chat_id, welcome_text, 'Markdown', keyboard)
+    await update.message.reply_text(
+        welcome_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
 
-def send_help_message(chat_id):
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send help message with detailed instructions"""
+    keyboard = [
+        [InlineKeyboardButton("🔍 Start Search", callback_data='search_phone')],
+        [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
     help_text = """
 📖 **How to Use This Bot:** 🤖
 
 1️⃣ **Click** *"Phone Search"* button
-2️⃣ **Enter** 10-digit phone number in *any format*:
-   📝 Examples:
-   • `7253715117`
-   • `91 0000 000000`  
-   • `+910000000000`
-   • `09999711627`
+2️⃣ **Enter** 10-digit phone number:
+   📝 **Examples:**
+   • `9525416053`
+   • `9142647674`  
+   • `9876543290`
 3️⃣ **Receive** detailed intelligence report
 
 ⚡ **Smart Features:**
@@ -277,244 +241,223 @@ def send_help_message(chat_id):
 • 👨‍💼 Comprehensive name details
 • 🏡 Complete address mapping
 • 📞 Alternative number tracking
-• 🌍 Telecom circle information
-• 🎯 All relevant results (no limits!)
     """
     
-    keyboard = {
-        'inline_keyboard': [
-            [{'text': '🔍 Start Search', 'callback_data': 'search_phone'}],
-            [{'text': '🏠 Main Menu', 'callback_data': 'home'}]
+    await update.message.reply_text(
+        help_text,
+        reply_markup=reply_markup,
+        parse_mode='Markdown'
+    )
+
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle inline button clicks"""
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == 'search_phone':
+        await query.edit_message_text(
+            "🔍 **Phone Number Search** 📱\n\nPlease enter the 10-digit phone number:\n\n**Examples:** \n• `9525416052`\n• `9142647694`\n• `9876543210`",
+            parse_mode='Markdown'
+        )
+        context.user_data['waiting_for_phone'] = True
+        
+    elif query.data == 'help':
+        keyboard = [
+            [InlineKeyboardButton("🔍 Start Search", callback_data='search_phone')],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
         ]
-    }
-    
-    return send_telegram_message(chat_id, help_text, 'Markdown', keyboard)
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        help_text = """
+📖 **How to Use This Bot:** 🤖
 
-def send_about_message(chat_id):
-    """Send about message"""
-    about_text = """
-🤖 **About Phone Intelligence Bot**
+1️⃣ **Click** *"Phone Search"* button
+2️⃣ **Enter** 10-digit phone number:
+   📝 **Examples:**
+   • `9525413052`
+   • `9142647894`  
+   • `9876546210`
+3️⃣ **Receive** detailed intelligence report
 
-**Version:** 2.0 • **Status:** 🟢 Active
-
-🔧 **Technical Features:**
-• Advanced API Integration
-• Real-time Data Processing  
-• Smart Duplicate Filtering
-• Secure & Private Queries
-• 24/7 Availability
-
-📊 **Capabilities:**
-• Multiple database access
-• Comprehensive result analysis
-• Beautiful formatted reports
-• Instant response times
-
-👨‍💻 **Developer:** Advanced AI Systems
-🕒 **Uptime:** 99.9% Reliability
-    """
-    
-    keyboard = {
-        'inline_keyboard': [
-            [{'text': '🔍 Start Searching', 'callback_data': 'search_phone'}],
-            [{'text': '📖 User Guide', 'callback_data': 'help'}],
-            [{'text': '🏠 Main Menu', 'callback_data': 'home'}]
+⚡ **Smart Features:**
+• 🔄 Auto number normalization
+• 👨‍💼 Comprehensive name details
+• 🏡 Complete address mapping
+• 📞 Alternative number tracking
+        """
+        
+        await query.edit_message_text(
+            help_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+        
+    elif query.data == 'home':
+        keyboard = [
+            [InlineKeyboardButton("🔍 Phone Search", callback_data='search_phone')],
+            [InlineKeyboardButton("ℹ️ Help Guide", callback_data='help')]
         ]
-    }
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        welcome_text = """
+🎯 **Welcome to Phone Intelligence Bot** 🔍
+
+I can help you get detailed information about any phone number with precision and speed.
+
+✨ **Features:**
+• 👨‍💼 Name & Family Details
+• 🏡 Complete Address Information  
+• 📞 Alternative Contact Numbers
+• 🌍 Telecom Circle & Operator
+
+🚀 **Get started by clicking the search button below!**
+        """
+        
+        await query.edit_message_text(
+            welcome_text,
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
+
+async def handle_phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle phone number input from user"""
     
-    return send_telegram_message(chat_id, about_text, 'Markdown', keyboard)
+    if not context.user_data.get('waiting_for_phone'):
+        # If user sends a number without clicking button first
+        phone_number = update.message.text.strip()
+        if re.search(r'\d', phone_number) and len(re.sub(r'\D', '', phone_number)) >= 10:
+            # Process it directly
+            await process_phone_search(update, context, phone_number)
+        else:
+            keyboard = [
+                [InlineKeyboardButton("🔍 Phone Search", callback_data='search_phone')]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                "🤔 I'm not sure what you want to do. Please click the button below to start phone search!",
+                reply_markup=reply_markup
+            )
+        return
+    
+    phone_number = update.message.text.strip()
+    await process_phone_search(update, context, phone_number)
 
-def send_search_prompt(chat_id):
-    """Send search prompt message"""
-    text = """
-🔍 **Phone Number Search** 📱
-
-Please enter the 10-digit phone number you want to investigate:
-
-📝 **Format Examples:**
-
-   • `7253715117`
-   • `91 0000 000000`  
-   • `+910000000000`
-   • `09999711627`
-
-💡 **Tip:** You can enter the number in any format - I'll automatically clean it up!
-    """
-    return send_telegram_message(chat_id, text, 'Markdown')
-
-def process_phone_search(chat_id, phone_number):
+async def process_phone_search(update: Update, context: ContextTypes.DEFAULT_TYPE, phone_number: str):
     """Process phone number search with enhanced UX"""
-    # Send processing message with cool emojis
-    processing_text = f"""
-🕵️‍♂️ **Launching Investigation** 🔍
-
-**Target Number:** `{escape_markdown(phone_number)}`
-
-⏳ Scanning multiple databases...
-🔄 Processing information...
-📊 Analyzing results...
-
-Please wait while I gather comprehensive intelligence...
-    """
-    send_telegram_message(chat_id, processing_text, 'MarkdownV2')
+    # Clear waiting state
+    context.user_data['waiting_for_phone'] = False
+    
+    # Send processing message
+    processing_msg = await update.message.reply_text(
+        f"🕵️‍♂️ **Launching Investigation** 🔍\n\n**Target:** `{escape_markdown(phone_number)}`\n\n⏳ Scanning databases...",
+        parse_mode='MarkdownV2'
+    )
     
     # Normalize phone number
     normalized_number, message = normalize_phone_number(phone_number)
     
     if normalized_number is None:
-        error_text = f"""
-❌ **Invalid Input** 🚫
-
-{message}
-
-📋 **Please enter a valid 10-digit phone number:**
-
-💡 **Examples:**
- 📝 Examples:
-   • `7253715117`
-   • `91 0000 000000`  
-   • `+910000000000`
-   • `09999711627`
-        """
-        send_telegram_message(chat_id, error_text, 'Markdown')
+        await context.bot.delete_message(
+            chat_id=processing_msg.chat_id,
+            message_id=processing_msg.message_id
+        )
+        await update.message.reply_text(
+            f"❌ **Invalid Input** 🚫\n\n{message}\n\n**Please enter a valid 10-digit phone number.**",
+            parse_mode='Markdown'
+        )
         return
     
     # Show normalization info if needed
     if phone_number != normalized_number:
-        normalization_msg = f"""
-🔄 **Number Normalized** ✅
-
-**Original:** `{phone_number}`
-**Cleaned:** `{normalized_number}`
-
-Proceeding with cleaned number...
-        """
-        send_telegram_message(chat_id, normalization_msg, 'Markdown')
+        await context.bot.delete_message(
+            chat_id=processing_msg.chat_id,
+            message_id=processing_msg.message_id
+        )
+        normalization_msg = await update.message.reply_text(
+            f"🔄 **Number Normalized** ✅\n\n`{phone_number}` → `{normalized_number}`",
+            parse_mode='Markdown'
+        )
+        processing_msg = await update.message.reply_text(
+            f"🔍 **Searching for** `{escape_markdown(normalized_number)}`...",
+            parse_mode='MarkdownV2'
+        )
     
     # Get phone information
     data = get_phone_info(normalized_number)
     
     # Check if API returned error
     if 'error' in data:
-        error_text = f"""
-⚠️ **API Connection Error** 🔌
-
-**Details:** {escape_markdown(data['error'])}
-
-🔄 Please try again in a few moments.
-📞 If problem persists, try a different number.
-        """
-        keyboard = {
-            'inline_keyboard': [
-                [{'text': '🔄 Try Again', 'callback_data': 'search_phone'}],
-                [{'text': '🏠 Main Menu', 'callback_data': 'home'}]
-            ]
-        }
-        send_telegram_message(chat_id, error_text, 'MarkdownV2', keyboard)
+        await context.bot.delete_message(
+            chat_id=processing_msg.chat_id,
+            message_id=processing_msg.message_id
+        )
+        error_text = f"❌ **API Error** 🔌\n\n{escape_markdown(data['error'])}"
+        keyboard = [
+            [InlineKeyboardButton("🔄 Try Again", callback_data='search_phone')],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            error_text,
+            reply_markup=reply_markup,
+            parse_mode='MarkdownV2'
+        )
         return
     
     # Check if no data found
     if not data.get('data'):
-        error_text = f"""
-🔍 **No Intelligence Found** 🕵️‍♂️
-
-**Number:** `{escape_markdown(normalized_number)}`
-
-📊 **Possible Reasons:**
-• 📵 Number not in our databases
-• 🔄 Try a different number format  
-• 🆕 Number might be new/unregistered
-• 🔒 Number information is protected
-        """
-        keyboard = {
-            'inline_keyboard': [
-                [{'text': '🔄 Try Different Number', 'callback_data': 'search_phone'}],
-                [{'text': '🏠 Main Menu', 'callback_data': 'home'}]
-            ]
-        }
-        send_telegram_message(chat_id, error_text, 'MarkdownV2', keyboard)
+        await context.bot.delete_message(
+            chat_id=processing_msg.chat_id,
+            message_id=processing_msg.message_id
+        )
+        error_text = f"🔍 **No Data Found** 🕵️‍♂️\n\nNumber: `{escape_markdown(normalized_number)}`"
+        keyboard = [
+            [InlineKeyboardButton("🔄 Try Different Number", callback_data='search_phone')],
+            [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            error_text,
+            reply_markup=reply_markup,
+            parse_mode='MarkdownV2'
+        )
         return
     
     # Format and send results
     result_message = format_phone_results(normalized_number, data)
     
-    keyboard = {
-        'inline_keyboard': [
-            [{'text': '🔍 New Search', 'callback_data': 'search_phone'}],
-            [{'text': '🏠 Main Menu', 'callback_data': 'home'}],
-            [{'text': '📊 More Info', 'callback_data': 'about'}]
-        ]
-    }
+    # Delete processing message
+    await context.bot.delete_message(
+        chat_id=processing_msg.chat_id,
+        message_id=processing_msg.message_id
+    )
     
-    # Split and send message parts
-    message_parts = split_long_message(result_message)
-    for i, part in enumerate(message_parts):
-        if i == len(message_parts) - 1:
-            # Last part gets the buttons
-            send_telegram_message(chat_id, part, 'MarkdownV2', keyboard)
-        else:
-            send_telegram_message(chat_id, part, 'MarkdownV2')
-
-@app.route('/')
-def index():
-    return "🎯 Phone Intelligence Bot is running! 🔍"
-
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Handle Telegram webhook"""
-    try:
-        data = request.get_json()
-        
-        if 'message' in data:
-            message = data['message']
-            chat_id = message['chat']['id']
-            text = message.get('text', '').strip()
-            
-            if text == '/start':
-                send_welcome_message(chat_id)
-            elif text == '/help':
-                send_help_message(chat_id)
-            elif text.startswith('/'):
-                # Ignore other commands
-                pass
-            else:
-                # Assume any other text is a phone number search
-                process_phone_search(chat_id, text)
-        
-        elif 'callback_query' in data:
-            callback_query = data['callback_query']
-            chat_id = callback_query['message']['chat']['id']
-            callback_data = callback_query['data']
-            
-            if callback_data == 'search_phone':
-                send_search_prompt(chat_id)
-            elif callback_data == 'help':
-                send_help_message(chat_id)
-            elif callback_data == 'about':
-                send_about_message(chat_id)
-            elif callback_data == 'home':
-                send_welcome_message(chat_id)
-            
-            # Answer callback query to remove loading state
-            requests.post(f"{TELEGRAM_API_URL}/answerCallbackQuery", 
-                         json={'callback_query_id': callback_query['id']})
-        
-        return 'OK'
+    keyboard = [
+        [InlineKeyboardButton("🔍 New Search", callback_data='search_phone')],
+        [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    except Exception as e:
-        logger.error(f"Webhook error: {e}")
-        return 'OK'
+    await update.message.reply_text(
+        result_message,
+        reply_markup=reply_markup,
+        parse_mode='MarkdownV2'
+    )
 
-@app.route('/set_webhook', methods=['GET'])
-def set_webhook():
-    """Set Telegram webhook (run this once)"""
-    # You need to replace this with your actual Render URL
-    webhook_url = "https://your-app-name.onrender.com/webhook"
-    response = requests.post(f"{TELEGRAM_API_URL}/setWebhook", 
-                           json={'url': webhook_url})
-    return response.json()
+def main() -> None:
+    """Start the bot"""
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).build()
+    
+    # Add handlers
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CallbackQueryHandler(button_handler, pattern='^(search_phone|help|home)$'))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone_input))
+    
+    # Start the Bot
+    print("🤖 Bot is running...")
+    application.run_polling()
 
 if __name__ == '__main__':
-
-    app.run(host='0.0.0.0', port=PORT, debug=False)
-
+    main()
