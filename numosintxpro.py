@@ -2,18 +2,14 @@ import os
 import logging
 import re
 import json
-from flask import Flask, request
-import telegram
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update, InputFile
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, MessageHandler, Filters, CallbackContext
+import asyncio
+from flask import Flask
 import requests
 
 # Bot configuration
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8361713613:AAEB7P0RTnb0gkBiW-MoV1Ce_35bKKW5w5E')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', 'YOUR_BOT_TOKEN_HERE')
 PORT = int(os.environ.get('PORT', 5000))
 
-# Initialize bot
-bot = telegram.Bot(token=BOT_TOKEN)
 app = Flask(__name__)
 
 # Enable logging
@@ -25,6 +21,15 @@ logger = logging.getLogger(__name__)
 
 # API endpoint
 PHONE_API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
+
+# Try to import telegram with compatibility
+try:
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+    from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+    TELEGRAM_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Telegram import error: {e}")
+    TELEGRAM_AVAILABLE = False
 
 def normalize_phone_number(phone_number):
     """
@@ -110,31 +115,36 @@ def safe_json_parse(response_text):
             logger.error(f"JSON cleanup failed: {e2}")
             return {"error": f"JSON parsing failed: {str(e2)}"}
 
-def get_unique_results(data):
-    """Get unique results based on mobile and name combination"""
+def get_relevant_results(data, searched_number):
+    """Get relevant results that match the searched mobile number"""
     if not data or 'data' not in data:
         return []
     
     seen = set()
-    unique_results = []
+    relevant_results = []
     
     for item in data['data']:
-        # Create a unique key based on mobile and cleaned name
+        # Check if this item is relevant to the searched number
         mobile = item.get('mobile', '')
-        name = clean_text(item.get('name', ''))
-        unique_key = f"{mobile}_{name}"
+        alt = item.get('alt', '')
         
-        if unique_key not in seen:
-            seen.add(unique_key)
-            unique_results.append(item)
+        # Include if mobile matches searched number OR alt matches searched number
+        if mobile == searched_number or alt == searched_number:
+            # Create a unique key based on mobile and cleaned name
+            name = clean_text(item.get('name', ''))
+            unique_key = f"{mobile}_{name}"
             
-            # Stop when we have 2 unique results
-            if len(unique_results) >= 2:
-                break
+            if unique_key not in seen:
+                seen.add(unique_key)
+                relevant_results.append(item)
+                
+                # Stop when we have 2 unique results
+                if len(relevant_results) >= 2:
+                    break
     
-    return unique_results
+    return relevant_results
 
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Send welcome message with inline keyboard"""
     keyboard = [
         [InlineKeyboardButton("📱 Phone Search", callback_data='search_phone')],
@@ -156,19 +166,19 @@ I can help you get detailed information about any phone number.
 Click the button below to start searching!
     """
     
-    update.message.reply_text(
+    await update.message.reply_text(
         welcome_text,
         reply_markup=reply_markup,
         parse_mode='Markdown'
     )
 
-def button_handler(update: Update, context: CallbackContext) -> None:
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle inline button clicks"""
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     if query.data == 'search_phone':
-        query.edit_message_text(
+        await query.edit_message_text(
             "📱 *Phone Number Search*\n\nPlease enter the 10-digit phone number:\n\n*Examples:* \n• `9525416052`\n• `9142647694`\n• `9876543210`",
             parse_mode='Markdown'
         )
@@ -184,22 +194,24 @@ def button_handler(update: Update, context: CallbackContext) -> None:
    - 91 9525 416052
    - +919525416052
    - 09525416052
-3. 📊 Get detailed information with 2 unique results
+3. 📊 Get detailed information with relevant results
 
 *⚡ Smart Features:*
 • 🔄 Auto number normalization
 • 👤 Name & Family Details
 • 🏠 Complete Address
 • 📞 Alternative Numbers
-• 🎯 Only 2 unique results
+• 🎯 Only relevant results
         """
-        query.edit_message_text(
+        await query.edit_message_text(
             help_text,
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup([
                 [InlineKeyboardButton("📱 Start Search", callback_data='search_phone')]
             ])
         )
+    elif query.data == 'home':
+        await home_handler(update, context)
 
 def get_phone_info(phone_number):
     """Fetch phone information from API with better error handling"""
@@ -249,9 +261,9 @@ def format_phone_result(result, result_number):
     
     return message
 
-def format_phone_results(phone_number, data):
+def format_phone_results(searched_number, data):
     """Format all phone results"""
-    message = f"📱 *Phone Information for {escape_markdown(phone_number)}*\n\n"
+    message = f"📱 *Phone Information for {escape_markdown(searched_number)}*\n\n"
     message += "═" * 40 + "\n\n"
     
     if 'error' in data:
@@ -266,22 +278,22 @@ def format_phone_results(phone_number, data):
         message += "• Number might be new/unregistered\n"
         return message
     
-    unique_results = get_unique_results(data)
+    relevant_results = get_relevant_results(data, searched_number)
     
-    if not unique_results:
-        message += "❌ *No unique results found*\n\n"
-        message += "All results were duplicates\n"
+    if not relevant_results:
+        message += "❌ *No relevant results found*\n\n"
+        message += "No records found matching the searched number\n"
         return message
     
     # Add result count info
     total_results = len(data.get('data', []))
-    unique_count = len(unique_results)
-    message += f"📈 *Found {total_results} total results, showing {unique_count} unique*\n\n"
+    relevant_count = len(relevant_results)
+    message += f"📈 *Found {total_results} total results, showing {relevant_count} relevant*\n\n"
     
-    # Format each unique result
-    for i, result in enumerate(unique_results, 1):
+    # Format each relevant result
+    for i, result in enumerate(relevant_results, 1):
         message += format_phone_result(result, i)
-        if i < len(unique_results):  # Don't add separator after last result
+        if i < len(relevant_results):  # Don't add separator after last result
             message += "\n" + "─" * 30 + "\n\n"
     
     message += "\n" + "═" * 40 + "\n"
@@ -309,7 +321,7 @@ def split_long_message(message, max_length=4096):
     
     return parts
 
-def handle_phone_input(update: Update, context: CallbackContext) -> None:
+async def handle_phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle phone number input from user"""
     
     if not context.user_data.get('waiting_for_phone'):
@@ -321,7 +333,7 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
     normalized_number, message = normalize_phone_number(phone_number)
     
     if normalized_number is None:
-        update.message.reply_text(
+        await update.message.reply_text(
             f"{message}\n\n*Please enter a valid 10-digit phone number:*\n\n*Examples:* \n• `9525416052`\n• `9142647694`\n• `9876543210`",
             parse_mode='Markdown'
         )
@@ -329,13 +341,13 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
     
     # Show normalization info
     if phone_number != normalized_number:
-        update.message.reply_text(
+        await update.message.reply_text(
             f"🔄 *Number Normalized:*\n`{phone_number}` → `{normalized_number}`",
             parse_mode='Markdown'
         )
     
     # Send processing message
-    processing_msg = update.message.reply_text(
+    processing_msg = await update.message.reply_text(
         f"🔍 *Searching for {escape_markdown(normalized_number)}\\.\\.\\.*\n\n⏳ Please wait while we fetch the information\\.\\.\\.",
         parse_mode='MarkdownV2'
     )
@@ -348,7 +360,7 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
         if 'error' in data:
             error_text = f"❌ *API Error\\!*\n\n{escape_markdown(data['error'])}\n\nPlease try again later\\."
             
-            context.bot.edit_message_text(
+            await context.bot.edit_message_text(
                 chat_id=processing_msg.chat_id,
                 message_id=processing_msg.message_id,
                 text=error_text,
@@ -364,7 +376,7 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
         if not data.get('data'):
             error_text = f"❌ *No Data Found\\!*\n\nNo information found for `{escape_markdown(normalized_number)}`\n\n*Possible reasons:*\n• Number not in database\n• Try different number\n• Number might be new"
             
-            context.bot.edit_message_text(
+            await context.bot.edit_message_text(
                 chat_id=processing_msg.chat_id,
                 message_id=processing_msg.message_id,
                 text=error_text,
@@ -390,7 +402,7 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Delete processing message
-        context.bot.delete_message(
+        await context.bot.delete_message(
             chat_id=processing_msg.chat_id,
             message_id=processing_msg.message_id
         )
@@ -399,13 +411,13 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
         for i, part in enumerate(message_parts):
             if i == len(message_parts) - 1:
                 # Last part gets the buttons
-                update.message.reply_text(
+                await update.message.reply_text(
                     part,
                     parse_mode='MarkdownV2',
                     reply_markup=reply_markup
                 )
             else:
-                update.message.reply_text(
+                await update.message.reply_text(
                     part,
                     parse_mode='MarkdownV2'
                 )
@@ -413,7 +425,7 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
         error_text = f"❌ *Unexpected Error\\!*\n\nPlease try again later\\.\n\n⚡ Error: {escape_markdown(str(e))}"
-        context.bot.edit_message_text(
+        await context.bot.edit_message_text(
             chat_id=processing_msg.chat_id,
             message_id=processing_msg.message_id,
             text=error_text,
@@ -423,10 +435,10 @@ def handle_phone_input(update: Update, context: CallbackContext) -> None:
     # Reset the waiting state
     context.user_data['waiting_for_phone'] = False
 
-def home_handler(update: Update, context: CallbackContext) -> None:
+async def home_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle home button"""
     query = update.callback_query
-    query.answer()
+    await query.answer()
     
     keyboard = [
         [InlineKeyboardButton("📱 Phone Search", callback_data='search_phone')],
@@ -444,45 +456,53 @@ I can help you get detailed information about any phone number\\.
 • 👤 Name & Family Details
 • 🏠 Complete Address
 • 📞 Alternative Numbers
-• 🎯 Only 2 unique results
+• 🎯 Only relevant results
 
 Click the button below to start searching\\!
     """
     
-    query.edit_message_text(
+    await query.edit_message_text(
         welcome_text,
         reply_markup=reply_markup,
         parse_mode='MarkdownV2'
     )
 
-def main() -> None:
+def start_bot():
     """Start the bot"""
-    # Create updater and dispatcher
-    updater = Updater(BOT_TOKEN)
-    dispatcher = updater.dispatcher
+    if not TELEGRAM_AVAILABLE:
+        logger.error("Telegram library not available. Bot cannot start.")
+        return
+    
+    # Create application
+    application = Application.builder().token(BOT_TOKEN).build()
     
     # Add handlers
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("help", start))
-    dispatcher.add_handler(CallbackQueryHandler(button_handler, pattern='^(search_phone|help)$'))
-    dispatcher.add_handler(CallbackQueryHandler(home_handler, pattern='^home$'))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_phone_input))
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("help", start))
+    application.add_handler(CallbackQueryHandler(button_handler, pattern='^(search_phone|help|home)$'))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone_input))
     
     # Start the Bot
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 @app.route('/')
 def index():
     return "📱 Phone Info Bot is running!"
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    """Webhook handler for production"""
-    update = telegram.Update.de_json(request.get_json(), bot)
-    dispatcher.process_update(update)
-    return 'OK'
+@app.route('/health')
+def health():
+    return "✅ Bot is healthy"
+
+def main():
+    """Main function to start both Flask app and Telegram bot"""
+    # Start bot in a separate thread
+    import threading
+    bot_thread = threading.Thread(target=start_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+    
+    # Start Flask app
+    app.run(host='0.0.0.0', port=PORT, debug=False)
 
 if __name__ == '__main__':
-    # For development
     main()
