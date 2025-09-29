@@ -1,8 +1,0 @@
-services:
-  - type: web
-    name: telegram-bot
-    env: python
-    plan: free
-    pythonVersion: 3.12.5   # 👈 is line ki wajah se Render python 3.12 use karega
-    buildCommand: pip install -r requirements.txt
-    startCommand: python numosintxpro.py
