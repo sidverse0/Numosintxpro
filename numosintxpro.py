@@ -6,7 +6,7 @@ import requests
 from flask import Flask, request
 
 # Bot configuration
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8116705267:AAHuwa5tUK2sErOtTf64StZ4STOQUv2Abp4')
+BOT_TOKEN = os.environ.get('BOT_TOKEN', '8361713613:AAEB7P0RTnb0gkBiW-MoV1Ce_35bKKW5w5E')
 PORT = int(os.environ.get('PORT', 5000))
 
 app = Flask(__name__)
@@ -517,3 +517,4 @@ def set_webhook():
 if __name__ == '__main__':
 
     app.run(host='0.0.0.0', port=PORT, debug=False)
+
