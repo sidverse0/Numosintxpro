@@ -64,14 +64,21 @@ def clean_text(text):
     return cleaned
 
 def format_address(address):
-    """Format address by replacing ! with new lines and cleaning"""
+    """Format address by replacing ! with commas and cleaning"""
     if not address:
         return "N/A"
     
-    # Replace ! with new lines and clean
-    formatted = address.replace('!', '\n')
-    # Remove extra spaces
+    # Replace ! with commas and clean
+    formatted = address.replace('!', ', ')
+    # Remove extra spaces and clean
     formatted = re.sub(r'\s+', ' ', formatted)
+    # Remove duplicate commas
+    formatted = re.sub(r',\s*,', ',', formatted)
+    # Add space after commas
+    formatted = re.sub(r',', ', ', formatted)
+    # Remove extra spaces around commas
+    formatted = re.sub(r'\s*,\s*', ', ', formatted)
+    
     return formatted.strip()
 
 def safe_json_parse(response_text):
@@ -225,7 +232,7 @@ def format_phone_result(result, result_number):
     message += f"👤 *Name:* {escape_markdown(clean_text(result.get('name', 'N/A')))}\n"
     message += f"👨‍👦 *Father:* {escape_markdown(clean_text(result.get('fname', 'N/A')))}\n"
     
-    # Format address properly
+    # Format address properly with commas
     address = format_address(result.get('address', ''))
     message += f"🏠 *Address:* {escape_markdown(address)}\n"
     
