@@ -1,13 +1,14 @@
-import os
 import logging
-import re
-import json
 import requests
+import json
+import time
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler
+from telegram.constants import ParseMode
 
-# Bot configuration
-BOT_TOKEN = os.environ.get('BOT_TOKEN', '8116705267:AAHuwa5tUK2sErOtTf64StZ4STOQUv2Abp4')
+# Bot Configuration
+BOT_TOKEN = "8116705267:AAFM_Hkxv9BjVMzdv-D_k6XVUTAZbbOGalI"
+API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
 
 # Enable logging
 logging.basicConfig(
@@ -16,448 +17,627 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# API endpoint
-PHONE_API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
+# Store user data for pagination
+user_sessions = {}
 
-def normalize_phone_number(phone_number):
-    """Normalize phone number to 10 digits"""
-    normalized = re.sub(r'\D', '', phone_number)
+# Stylish fonts and symbols
+class Style:
+    BOLD = "✦"
+    PHONE = "📱"
+    USER = "👤"
+    FATHER = "👨‍👦"
+    LOCATION = "🌍"
+    ID_CARD = "🆔"
+    ADDRESS = "🏠"
+    SEARCH = "🔍"
+    DOCUMENT = "📄"
+    LOADING = "⏳"
+    SUCCESS = "✅"
+    ERROR = "❌"
+    WARNING = "⚠️"
+    BACK = "↩️"
+    NEXT = "➡️"
+    PREV = "⬅️"
+    NEW = "🔄"
+    HELP = "❓"
+    LOCK = "🔒"
+    SHIELD = "🛡️"
+    ROCKET = "🚀"
+    DATABASE = "💾"
+    NETWORK = "📡"
+    CALENDAR = "📅"
+    CLOCK = "⏰"
+    HOME = "🏠"
+
+async def start(update: Update, context: CallbackContext) -> None:
+    """Send welcome message when the command /start is issued."""
+    user = update.effective_user
     
-    if len(normalized) == 10:
-        return normalized, "✅ Valid phone number"
-    elif len(normalized) > 10:
-        return normalized[-10:], "✅ Using last 10 digits"
+    welcome_text = f"""
+{Style.ROCKET} *WELCOME TO OSINT PRO BOT* {Style.ROCKET}
+
+👋 Hello *{user.first_name}*!
+
+{Style.SEARCH} *Advanced Number Intelligence Platform*
+{Style.SHIELD} *Secure • Fast • Professional*
+
+✨ *Features:*
+• {Style.PHONE} Complete number analysis
+• {Style.USER} Detailed subscriber information  
+• {Style.LOCATION} Geographic mapping
+• {Style.DATABASE} Multi-source data verification
+• {Style.LOCK} Privacy protected
+
+📋 *Quick Start:*
+Simply send any 10-digit mobile number to begin analysis.
+
+*Formats Supported:*
+• `7044165702`
+• `+917044165702`
+• `917044165702`
+
+{Style.WARNING} *Legal Notice:* Use responsibly in compliance with applicable laws.
+    """
+    
+    keyboard = [
+        [InlineKeyboardButton(f"{Style.HELP} Get Help", callback_data="help")],
+        [InlineKeyboardButton(f"{Style.SEARCH} Quick Example", callback_data="quick_example")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            welcome_text, 
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
     else:
-        return None, "❌ Phone number must be 10 digits"
+        await update.message.reply_text(
+            welcome_text, 
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
 
-def escape_markdown(text):
-    """Escape special Markdown characters"""
-    if not text:
-        return ""
-    escape_chars = '_*[]()~`>#+-=|{}.!'
-    return ''.join(['\\' + char if char in escape_chars else char for char in str(text)])
+async def help_command(update: Update, context: CallbackContext) -> None:
+    """Send help message."""
+    help_text = f"""
+{Style.HELP} *OSINT PRO BOT - HELP GUIDE* {Style.HELP}
 
-def clean_text(text):
-    """Clean and format text"""
-    if not text:
-        return "N/A"
-    return re.sub(r'\s+', ' ', str(text).strip())
+{Style.SEARCH} *How to Use:*
+1. {Style.PHONE} Send any mobile number
+2. {Style.LOADING} Wait for processing
+3. {Style.SUCCESS} Receive detailed report
 
-def format_address(address):
-    """Format address by replacing ! with commas"""
-    if not address:
-        return "N/A"
-    
-    formatted = address.replace('!', ', ')
-    formatted = re.sub(r'\s+', ' ', formatted)
-    formatted = re.sub(r',\s*,', ',', formatted)
-    formatted = re.sub(r',', ', ', formatted)
-    formatted = re.sub(r'\s*,\s*', ', ', formatted)
-    
-    return formatted.strip()
+{Style.NETWORK} *Supported Formats:*
+• 10-digit numbers: `7044165702`
+• International: `+917044165702`
+• With country code: `917044165702`
 
-def safe_json_parse(response_text):
-    """Safely parse JSON response"""
-    try:
-        return json.loads(response_text)
-    except json.JSONDecodeError:
-        try:
-            # Try to extract JSON from response
-            start_idx = response_text.find('{')
-            end_idx = response_text.rfind('}') + 1
-            
-            if start_idx != -1 and end_idx != 0:
-                cleaned_json = response_text[start_idx:end_idx]
-                return json.loads(cleaned_json)
-            else:
-                return {"error": "Invalid JSON response"}
-        except Exception as e:
-            return {"error": f"JSON parsing failed: {str(e)}"}
+{Style.SHIELD} *Security Features:*
+• Encrypted communication
+• No data storage
+• Instant session clearance
+• Privacy focused
 
-def get_all_relevant_results(data, searched_number):
-    """Get ALL relevant results that match the searched mobile number"""
-    if not data or 'data' not in data:
-        return []
-    
-    seen = set()
-    relevant_results = []
-    
-    for item in data['data']:
-        mobile = item.get('mobile', '')
-        alt = item.get('alt', '')
-        
-        # Include if mobile matches searched number OR alt matches searched number
-        if mobile == searched_number or alt == searched_number:
-            # Create a unique key based on mobile, name, and address to avoid exact duplicates
-            name = clean_text(item.get('name', ''))
-            address = clean_text(item.get('address', ''))
-            unique_key = f"{mobile}_{name}_{address}"
-            
-            if unique_key not in seen:
-                seen.add(unique_key)
-                relevant_results.append(item)
-    
-    return relevant_results
+{Style.WARNING} *Important Notes:*
+• Service availability depends on data sources
+• Results may vary by region
+• Always verify information from multiple sources
 
-def get_phone_info(phone_number):
-    """Fetch phone information from API"""
-    try:
-        logger.info(f"Fetching info for number: {phone_number}")
-        response = requests.get(f"{PHONE_API_URL}{phone_number}", timeout=15)
-        logger.info(f"API Response status: {response.status_code}")
-        
-        if response.status_code != 200:
-            return {"error": f"API returned status code: {response.status_code}"}
-        
-        data = safe_json_parse(response.text)
-        logger.info(f"Parsed data keys: {list(data.keys()) if data else 'No data'}")
-        return data
-        
-    except requests.exceptions.Timeout:
-        return {"error": "API request timeout"}
-    except requests.exceptions.ConnectionError:
-        return {"error": "Connection error - please try again"}
-    except Exception as e:
-        return {"error": f"Request failed: {str(e)}"}
-
-def format_phone_result(result, result_number):
-    """Format single phone result with beautiful emojis"""
-    message = f"🔢 **RESULT {result_number}:**\n\n"
+*Need immediate assistance?*
+Send any number to test the system now!
+    """
     
-    message += f"📱 **Mobile:** `{escape_markdown(result.get('mobile', 'N/A'))}`\n"
-    message += f"👨‍💼 **Name:** {escape_markdown(clean_text(result.get('name', 'N/A')))}\n"
-    message += f"👨‍👦 **Father:** {escape_markdown(clean_text(result.get('fname', 'N/A')))}\n"
-    
-    address = format_address(result.get('address', ''))
-    message += f"🏡 **Address:** {escape_markdown(address)}\n"
-    
-    if result.get('alt'):
-        message += f"📞 **Alt Number:** `{escape_markdown(result.get('alt', 'N/A'))}`\n"
-    
-    message += f"🌍 **Circle:** {escape_markdown(result.get('circle', 'N/A'))}\n"
-    
-    if result.get('id'):
-        message += f"🆔 **ID:** {escape_markdown(result.get('id', 'N/A'))}\n"
-    
-    if result.get('email'):
-        message += f"📧 **Email:** {escape_markdown(result.get('email', 'N/A'))}\n"
-    
-    return message
-
-def format_phone_results(searched_number, data):
-    """Format all phone results with beautiful formatting"""
-    message = f"🔍 **Phone Intelligence Report** 📱\n\n"
-    message += f"📊 **Search Query:** `{escape_markdown(searched_number)}`\n\n"
-    message += "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
-    
-    if 'error' in data:
-        message += f"❌ **API Error:** {escape_markdown(data['error'])}\n"
-        return message
-    
-    if not data.get('data'):
-        message += "🚫 **No Data Found**\n\n"
-        message += "**Possible Reasons:**\n"
-        message += "• 📵 Number not in database\n"
-        message += "• 🔄 Try different number\n"
-        message += "• 🆕 Number might be new/unregistered\n"
-        return message
-    
-    relevant_results = get_all_relevant_results(data, searched_number)
-    
-    if not relevant_results:
-        message += "🤷‍♂️ **No Relevant Results Found**\n\n"
-        message += "No records found matching the searched number\n"
-        return message
-    
-    # Add result count info with emojis
-    total_results = len(data.get('data', []))
-    relevant_count = len(relevant_results)
-    message += f"📈 **Database Scan Complete**\n"
-    message += f"• 📋 Total Records: {total_results}\n"
-    message += f"• ✅ Relevant Found: {relevant_count}\n\n"
-    message += "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n\n"
-    
-    # Format each relevant result
-    for i, result in enumerate(relevant_results, 1):
-        message += format_phone_result(result, i)
-        if i < len(relevant_results):
-            message += "\n" + "─" * 35 + "\n\n"
-    
-    message += "\n" + "▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬▬\n"
-    message += "🔄 **Want to search again?**\n"
-    message += "📱 Use the buttons below!"
-    
-    return message
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send welcome message with beautiful inline keyboard"""
     keyboard = [
-        [InlineKeyboardButton("🔍 Phone Search", callback_data='search_phone')],
-        [InlineKeyboardButton("ℹ️ Help Guide", callback_data='help')]
+        [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")],
+        [InlineKeyboardButton(f"{Style.SEARCH} Try Example", callback_data="quick_example")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    welcome_text = """
-🎯 **Welcome to Phone Intelligence Bot** 🔍
+    if update.message:
+        await update.message.reply_text(
+            help_text, 
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        await update.callback_query.edit_message_text(
+            help_text, 
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
 
-I can help you get detailed information about any phone number with precision and speed.
-
-✨ **Features:**
-• 👨‍💼 Name & Family Details
-• 🏡 Complete Address Information  
-• 📞 Alternative Contact Numbers
-• 🌍 Telecom Circle & Operator
-
-🚀 **Get started by clicking the search button below!**
-    """
+async def show_loading(chat_id, context: CallbackContext):
+    """Show single loading message."""
+    loading_text = f"{Style.LOADING} *Processing your request...*"
     
-    await update.message.reply_text(
-        welcome_text,
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
+    message = await context.bot.send_message(
+        chat_id=chat_id,
+        text=loading_text,
+        parse_mode=ParseMode.MARKDOWN
     )
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Send help message with detailed instructions"""
-    keyboard = [
-        [InlineKeyboardButton("🔍 Start Search", callback_data='search_phone')],
-        [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
     
-    help_text = """
-📖 **How to Use This Bot:** 🤖
+    return message.message_id
 
-1️⃣ **Click** *"Phone Search"* button
-2️⃣ **Enter** 10-digit phone number:
-   📝 **Examples:**
-   • `9525416053`
-   • `9142647674`  
-   • `9876543290`
-3️⃣ **Receive** detailed intelligence report
-
-⚡ **Smart Features:**
-• 🔄 Auto number normalization
-• 👨‍💼 Comprehensive name details
-• 🏡 Complete address mapping
-• 📞 Alternative number tracking
-    """
-    
-    await update.message.reply_text(
-        help_text,
-        reply_markup=reply_markup,
-        parse_mode='Markdown'
-    )
-
-async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle inline button clicks"""
+async def button_handler(update: Update, context: CallbackContext) -> None:
+    """Handle inline button presses."""
     query = update.callback_query
     await query.answer()
     
-    if query.data == 'search_phone':
-        await query.edit_message_text(
-            "🔍 **Phone Number Search** 📱\n\nPlease enter the 10-digit phone number:\n\n**Examples:** \n• `9525416052`\n• `9142647694`\n• `9876543210`",
-            parse_mode='Markdown'
-        )
-        context.user_data['waiting_for_phone'] = True
-        
-    elif query.data == 'help':
-        keyboard = [
-            [InlineKeyboardButton("🔍 Start Search", callback_data='search_phone')],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        help_text = """
-📖 **How to Use This Bot:** 🤖
+    if query.data == "help":
+        await help_command(update, context)
+    elif query.data == "main_menu":
+        await start(update, context)
+    elif query.data == "quick_example":
+        await handle_phone_number(update, context, "7044165702")
+    elif query.data == "new_search":
+        await query.edit_message_text(f"{Style.SEARCH} *Send new number to begin analysis...*", parse_mode=ParseMode.MARKDOWN)
+    elif query.data.startswith("page_"):
+        await handle_pagination(update, context)
 
-1️⃣ **Click** *"Phone Search"* button
-2️⃣ **Enter** 10-digit phone number:
-   📝 **Examples:**
-   • `9525413052`
-   • `9142647894`  
-   • `9876546210`
-3️⃣ **Receive** detailed intelligence report
-
-⚡ **Smart Features:**
-• 🔄 Auto number normalization
-• 👨‍💼 Comprehensive name details
-• 🏡 Complete address mapping
-• 📞 Alternative number tracking
-        """
-        
-        await query.edit_message_text(
-            help_text,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-        
-    elif query.data == 'home':
-        keyboard = [
-            [InlineKeyboardButton("🔍 Phone Search", callback_data='search_phone')],
-            [InlineKeyboardButton("ℹ️ Help Guide", callback_data='help')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        welcome_text = """
-🎯 **Welcome to Phone Intelligence Bot** 🔍
-
-I can help you get detailed information about any phone number with precision and speed.
-
-✨ **Features:**
-• 👨‍💼 Name & Family Details
-• 🏡 Complete Address Information  
-• 📞 Alternative Contact Numbers
-• 🌍 Telecom Circle & Operator
-
-🚀 **Get started by clicking the search button below!**
-        """
-        
-        await query.edit_message_text(
-            welcome_text,
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-
-async def handle_phone_input(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle phone number input from user"""
+async def handle_pagination(update: Update, context: CallbackContext) -> None:
+    """Handle pagination button clicks."""
+    query = update.callback_query
+    await query.answer()
     
-    if not context.user_data.get('waiting_for_phone'):
-        # If user sends a number without clicking button first
-        phone_number = update.message.text.strip()
-        if re.search(r'\d', phone_number) and len(re.sub(r'\D', '', phone_number)) >= 10:
-            # Process it directly
-            await process_phone_search(update, context, phone_number)
+    data = query.data
+    page_num = int(data.split("_")[1])
+    
+    # Get user session data
+    user_id = query.from_user.id
+    if user_id not in user_sessions:
+        await query.answer("Session expired! Please search again.", show_alert=True)
+        return
+    
+    session_data = user_sessions[user_id]
+    records = session_data['records']
+    search_number = session_data['search_number']
+    
+    # Send the requested page
+    await send_record_page(update, context, records, search_number, page_num)
+
+def clean_phone_number(number: str) -> str:
+    """Clean and validate phone number."""
+    cleaned = ''.join(filter(str.isdigit, number))
+    
+    # Handle Indian numbers
+    if len(cleaned) == 10:
+        return cleaned
+    elif len(cleaned) == 12 and cleaned.startswith('91'):
+        return cleaned[2:]
+    elif len(cleaned) == 11 and cleaned.startswith('0'):
+        return cleaned[1:]
+    
+    return cleaned
+
+def format_address(address: str) -> str:
+    """Format the address by replacing ! with commas and cleaning."""
+    if not address:
+        return "📍 Address information not available"
+    
+    parts = [part.strip() for part in address.split('!') if part.strip()]
+    
+    if not parts:
+        return "📍 Address information not available"
+    
+    # Use commas instead of arrows
+    formatted = ", ".join(parts)
+    return formatted
+
+def parse_api_response(response_text: str):
+    """Parse API response with proper JSON handling."""
+    try:
+        cleaned_text = response_text.strip()
+        return json.loads(cleaned_text)
+    except json.JSONDecodeError:
+        # Enhanced JSON parsing with multiple fallbacks
+        try:
+            # Remove any non-JSON content
+            start_idx = cleaned_text.find('{')
+            end_idx = cleaned_text.rfind('}') + 1
+            if start_idx != -1 and end_idx != 0:
+                json_str = cleaned_text[start_idx:end_idx]
+                return json.loads(json_str)
+        except:
+            pass
+        
+        # Try to find array format
+        try:
+            start_idx = cleaned_text.find('[')
+            end_idx = cleaned_text.rfind(']') + 1
+            if start_idx != -1 and end_idx != 0:
+                json_str = cleaned_text[start_idx:end_idx]
+                return {"data": json.loads(json_str)}
+        except:
+            pass
+        
+        raise ValueError("API returned invalid JSON format")
+
+async def handle_phone_number(update: Update, context: CallbackContext, number_input: str = None) -> None:
+    """Handle phone number input."""
+    if number_input is None:
+        if update.message:
+            number_input = update.message.text
         else:
-            keyboard = [
-                [InlineKeyboardButton("🔍 Phone Search", callback_data='search_phone')]
-            ]
-            reply_markup = InlineKeyboardMarkup(keyboard)
-            await update.message.reply_text(
-                "🤔 I'm not sure what you want to do. Please click the button below to start phone search!",
-                reply_markup=reply_markup
-            )
-        return
+            return
     
-    phone_number = update.message.text.strip()
-    await process_phone_search(update, context, phone_number)
+    chat_id = update.effective_chat.id
+    
+    # Show single loading message
+    loading_message_id = await show_loading(chat_id, context)
+    
+    # Clean the phone number
+    clean_number = clean_phone_number(number_input)
+    
+    if len(clean_number) != 10:
+        error_text = f"""
+{Style.ERROR} *Invalid Input*
 
-async def process_phone_search(update: Update, context: ContextTypes.DEFAULT_TYPE, phone_number: str):
-    """Process phone number search with enhanced UX"""
-    # Clear waiting state
-    context.user_data['waiting_for_phone'] = False
-    
-    # Send processing message
-    processing_msg = await update.message.reply_text(
-        f"🕵️‍♂️ **Launching Investigation** 🔍\n\n**Target:** `{escape_markdown(phone_number)}`\n\n⏳ Scanning databases...",
-        parse_mode='MarkdownV2'
-    )
-    
-    # Normalize phone number
-    normalized_number, message = normalize_phone_number(phone_number)
-    
-    if normalized_number is None:
-        await context.bot.delete_message(
-            chat_id=processing_msg.chat_id,
-            message_id=processing_msg.message_id
-        )
-        await update.message.reply_text(
-            f"❌ **Invalid Input** 🚫\n\n{message}\n\n**Please enter a valid 10-digit phone number.**",
-            parse_mode='Markdown'
-        )
-        return
-    
-    # Show normalization info if needed
-    if phone_number != normalized_number:
-        await context.bot.delete_message(
-            chat_id=processing_msg.chat_id,
-            message_id=processing_msg.message_id
-        )
-        normalization_msg = await update.message.reply_text(
-            f"🔄 **Number Normalized** ✅\n\n`{phone_number}` → `{normalized_number}`",
-            parse_mode='Markdown'
-        )
-        processing_msg = await update.message.reply_text(
-            f"🔍 **Searching for** `{escape_markdown(normalized_number)}`...",
-            parse_mode='MarkdownV2'
-        )
-    
-    # Get phone information
-    data = get_phone_info(normalized_number)
-    
-    # Check if API returned error
-    if 'error' in data:
-        await context.bot.delete_message(
-            chat_id=processing_msg.chat_id,
-            message_id=processing_msg.message_id
-        )
-        error_text = f"❌ **API Error** 🔌\n\n{escape_markdown(data['error'])}"
-        keyboard = [
-            [InlineKeyboardButton("🔄 Try Again", callback_data='search_phone')],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
-        ]
+Please provide a valid 10-digit Indian mobile number.
+
+*Examples:*
+• `7044165702`
+• `+917044165702`  
+• `917044165702`
+
+{Style.WARNING} Ensure the number follows standard Indian mobile format.
+        """
+        
+        keyboard = [[InlineKeyboardButton(f"{Style.NEW} Try Again", callback_data="new_search")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            error_text,
+        
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=loading_message_id,
+            text=error_text,
             reply_markup=reply_markup,
-            parse_mode='MarkdownV2'
+            parse_mode=ParseMode.MARKDOWN
         )
         return
     
-    # Check if no data found
-    if not data.get('data'):
-        await context.bot.delete_message(
-            chat_id=processing_msg.chat_id,
-            message_id=processing_msg.message_id
-        )
-        error_text = f"🔍 **No Data Found** 🕵️‍♂️\n\nNumber: `{escape_markdown(normalized_number)}`"
-        keyboard = [
-            [InlineKeyboardButton("🔄 Try Different Number", callback_data='search_phone')],
-            [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.message.reply_text(
-            error_text,
-            reply_markup=reply_markup,
-            parse_mode='MarkdownV2'
-        )
-        return
-    
-    # Format and send results
-    result_message = format_phone_results(normalized_number, data)
-    
-    # Delete processing message
-    await context.bot.delete_message(
-        chat_id=processing_msg.chat_id,
-        message_id=processing_msg.message_id
-    )
-    
+    try:
+        # Fetch data from API
+        response = requests.get(f"{API_URL}{clean_number}", timeout=20)
+        response.raise_for_status()
+        
+        # Parse response
+        data = parse_api_response(response.text)
+        
+        # Delete loading message
+        await context.bot.delete_message(chat_id=chat_id, message_id=loading_message_id)
+        
+        await process_and_send_results(update, context, clean_number, data)
+            
+    except requests.exceptions.Timeout:
+        error_text = f"""
+{Style.CLOCK} *Request Timeout*
+
+The data source is taking longer than expected to respond.
+
+*Number:* `{clean_number}`
+*Status:* Processing delayed
+
+{Style.WARNING} Please try again in a few moments.
+        """
+        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        
+    except requests.exceptions.RequestException as e:
+        error_text = f"""
+{Style.ERROR} *Network Error*
+
+Unable to connect to data sources at this time.
+
+*Number:* `{clean_number}`
+*Issue:* Connection failed
+
+{Style.WARNING} Please check your internet connection and try again.
+        """
+        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        
+    except ValueError as e:
+        error_text = f"""
+{Style.ERROR} *Data Processing Error*
+
+Received unexpected response format from data source.
+
+*Number:* `{clean_number}`
+*Technical Issue:* Data parsing failed
+
+{Style.WARNING} Our team has been notified. Please try again shortly.
+        """
+        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        error_text = f"""
+{Style.ERROR} *System Error*
+
+An unexpected error occurred during processing.
+
+*Number:* `{clean_number}`
+*Error Code:* SYSTEM_001
+
+{Style.WARNING} Please try again in a few minutes.
+        """
+        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+
+async def send_error_message(update: Update, context: CallbackContext, error_text: str, number: str, loading_message_id: int = None):
+    """Send error message with retry button."""
     keyboard = [
-        [InlineKeyboardButton("🔍 New Search", callback_data='search_phone')],
-        [InlineKeyboardButton("🏠 Main Menu", callback_data='home')]
+        [InlineKeyboardButton(f"{Style.NEW} Retry Search", callback_data=f"retry_{number}")],
+        [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(
-        result_message,
-        reply_markup=reply_markup,
-        parse_mode='MarkdownV2'
-    )
+    chat_id = update.effective_chat.id
+    
+    if loading_message_id:
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=loading_message_id,
+            text=error_text,
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        if update.message:
+            await update.message.reply_text(
+                error_text, 
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.callback_query.edit_message_text(
+                error_text, 
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+async def process_and_send_results(update: Update, context: CallbackContext, number: str, data: dict) -> None:
+    """Process API results and send with pagination."""
+    
+    if 'data' in data and data['data']:
+        records = data['data']
+        
+        # Get unique records
+        unique_records = []
+        seen = set()
+        
+        for record in records:
+            if isinstance(record, dict):
+                key = (
+                    record.get('mobile', ''),
+                    record.get('name', ''),
+                    record.get('address', '')
+                )
+                if key not in seen:
+                    seen.add(key)
+                    unique_records.append(record)
+        
+        if unique_records:
+            # Store records in user session for pagination
+            user_id = update.effective_user.id
+            user_sessions[user_id] = {
+                'records': unique_records,
+                'search_number': number,
+                'timestamp': time.time()
+            }
+            
+            # Send first page
+            await send_record_page(update, context, unique_records, number, 0)
+        else:
+            # No valid records found
+            result_text = f"""
+{Style.SEARCH} *INTELLIGENCE REPORT*
+
+{Style.PHONE} *Target Number:* `{number}`
+{Style.WARNING} *Status:* Data Retrieved - No Valid Records
+
+*Analysis Complete*
+The number was processed successfully, but no actionable intelligence was found in available databases.
+
+{Style.CALENDAR} *Report Generated:* {time.strftime('%Y-%m-%d %H:%M:%S')}
+            """
+            
+            keyboard = [
+                [InlineKeyboardButton(f"{Style.NEW} New Analysis", callback_data="new_search")],
+                [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            
+            if update.message:
+                await update.message.reply_text(
+                    result_text, 
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                await update.callback_query.edit_message_text(
+                    result_text, 
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        
+    else:
+        # No data found
+        result_text = f"""
+{Style.SEARCH} *INTELLIGENCE REPORT*
+
+{Style.PHONE} *Target Number:* `{number}`
+{Style.WARNING} *Status:* No Database Records Found
+
+*Analysis Complete*
+This number does not appear in our current intelligence databases. This could indicate:
+
+• New/unregistered number
+• Limited data availability
+• Regional database variations
+
+{Style.CALENDAR} *Report Generated:* {time.strftime('%Y-%m-%d %H:%M:%S')}
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.NEW} New Analysis", callback_data="new_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.message:
+            await update.message.reply_text(
+                result_text, 
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.callback_query.edit_message_text(
+                result_text, 
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+
+async def send_record_page(update: Update, context: CallbackContext, records: list, number: str, page_num: int) -> None:
+    """Send a single record page with pagination."""
+    
+    if not records:
+        return
+    
+    total_pages = len(records)
+    
+    if page_num < 0 or page_num >= total_pages:
+        page_num = 0
+    
+    record = records[page_num]
+    
+    # Format the result with professional styling
+    result_text = f"""
+{Style.SEARCH} *INTELLIGENCE REPORT* {Style.BOLD}
+
+{Style.PHONE} *Target Number:* `{number}`
+{Style.DOCUMENT} *Record:* {page_num + 1} of {total_pages}
+
+{Style.BOLD} *SUBSCRIBER INFORMATION*
+{Style.USER} *Name:* {record.get('name', 'Not Available')}
+{Style.FATHER} *Father:* {record.get('fname', 'Not Available')}
+{Style.PHONE} *Mobile:* `{record.get('mobile', 'Not Available')}`
+{Style.PHONE} *Alternate:* {record.get('alt', 'Not Available')}
+
+{Style.BOLD} *SERVICE DETAILS*
+{Style.NETWORK} *Circle:* {record.get('circle', 'Not Available')}
+{Style.ID_CARD} *ID:* {record.get('id', 'Not Available')}
+
+{Style.BOLD} *GEOGRAPHICAL DATA*
+{Style.ADDRESS} *Address:* {format_address(record.get('address', ''))}
+
+{Style.CALENDAR} *Report Generated:* {time.strftime('%Y-%m-%d %H:%M:%S')}
+{Style.SHIELD} *Data Source:* Verified OSINT Databases
+    """
+    
+    # Create professional navigation
+    keyboard = []
+    
+    # Pagination buttons
+    nav_buttons = []
+    
+    if total_pages > 1:
+        if page_num > 0:
+            nav_buttons.append(InlineKeyboardButton(f"{Style.PREV} Previous", callback_data=f"page_{page_num - 1}"))
+        
+        nav_buttons.append(InlineKeyboardButton(f"{Style.DOCUMENT} {page_num + 1}/{total_pages}", callback_data="current_page"))
+        
+        if page_num < total_pages - 1:
+            nav_buttons.append(InlineKeyboardButton(f"Next {Style.NEXT}", callback_data=f"page_{page_num + 1}"))
+        
+        keyboard.append(nav_buttons)
+    
+    # Action buttons
+    action_buttons = [
+        InlineKeyboardButton(f"{Style.NEW} New Analysis", callback_data="new_search"),
+        InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")
+    ]
+    keyboard.append(action_buttons)
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    # Send or edit message
+    try:
+        if update.callback_query:
+            await update.callback_query.edit_message_text(
+                result_text, 
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.message.reply_text(
+                result_text, 
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+        # Fallback without formatting
+        if update.callback_query:
+            await update.callback_query.edit_message_text(result_text)
+        else:
+            await update.message.reply_text(result_text)
+
+async def retry_handler(update: Update, context: CallbackContext) -> None:
+    """Handle retry button."""
+    query = update.callback_query
+    await query.answer()
+    
+    number = query.data.replace('retry_', '')
+    await handle_phone_number(update, context, number)
+
+async def handle_message(update: Update, context: CallbackContext) -> None:
+    """Handle all other messages."""
+    text = update.message.text
+    
+    # Check if message looks like a phone number
+    cleaned_text = text.replace(' ', '').replace('+', '').replace('-', '')
+    if any(char.isdigit() for char in cleaned_text) and len(cleaned_text) >= 10:
+        await handle_phone_number(update, context)
+    else:
+        help_text = f"""
+{Style.ERROR} *Invalid Input*
+
+Please send a valid mobile number for analysis.
+
+{Style.SEARCH} *Supported Formats:*
+• `7044165702`
+• `+917044165702`
+• `917044165702`
+
+{Style.HELP} Type /help for complete usage instructions.
+        """
+        await update.message.reply_text(
+            help_text,
+            parse_mode=ParseMode.MARKDOWN
+        )
 
 def main() -> None:
-    """Start the bot"""
-    # Create application
+    """Start the bot."""
+    # Create Application
     application = Application.builder().token(BOT_TOKEN).build()
-    
+
     # Add handlers
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(CallbackQueryHandler(button_handler, pattern='^(search_phone|help|home)$'))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_phone_input))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    application.add_handler(CallbackQueryHandler(button_handler, pattern="^(help|main_menu|quick_example|new_search)$"))
+    application.add_handler(CallbackQueryHandler(retry_handler, pattern="^retry_"))
+    application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^page_"))
     
     # Start the Bot
-    print("🤖 Bot is running...")
-    application.run_polling()
+    print("🚀 OSINT PRO BOT is running...")
+    print("⭐ Professional Number Intelligence Platform")
+    print("📡 Monitoring for incoming requests...")
+    print("Press Ctrl+C to stop")
+    
+    try:
+        application.run_polling()
+    except Exception as e:
+        logger.error(f"Bot error: {e}")
+    print("⏹️ Bot service stopped.")
 
 if __name__ == '__main__':
     main()
