@@ -10,7 +10,9 @@ from telegram.constants import ParseMode
 
 # Bot Configuration
 BOT_TOKEN = "8116705267:AAHVoyKFuX2Jrt0jHrP4nyIeq-YKvbSjCQs"
-API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
+PHONE_API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
+VEHICLE_API1_URL = "https://revangevichelinfo.vercel.app/api/rc?number="
+VEHICLE_API2_URL = "https://caller.hackershub.shop/info.php?type=address&registration="
 
 # Keep Alive Server Configuration
 KEEP_ALIVE_PORT = 8080
@@ -25,35 +27,56 @@ logger = logging.getLogger(__name__)
 # Store user data for pagination
 user_sessions = {}
 
-# Stylish fonts and symbols
+# Comprehensive stylish fonts and symbols
 class Style:
+    # Common symbols
     BOLD = "✦"
-    PHONE = "📱"
-    USER = "👤"
-    FATHER = "👨‍👦"
-    LOCATION = "🌍"
-    ID_CARD = "🆔"
-    ADDRESS = "🏠"
     SEARCH = "🔍"
-    DOCUMENT = "📄"
-    LOADING = "⏳"
+    HELP = "❓"
+    HOME = "🏠"
     SUCCESS = "✅"
     ERROR = "❌"
     WARNING = "⚠️"
-    BACK = "↩️"
-    NEXT = "➡️"
-    PREV = "⬅️"
-    NEW = "🔄"
-    HELP = "❓"
-    LOCK = "🔒"
+    LOADING = "⏳"
+    DOCUMENT = "📄"
+    LOCATION = "📍"
+    CALENDAR = "📅"
+    USER = "👤"
+    FATHER = "👨‍👦"
     SHIELD = "🛡️"
     ROCKET = "🚀"
     DATABASE = "💾"
     NETWORK = "📡"
-    CALENDAR = "📅"
     CLOCK = "⏰"
-    HOME = "🏠"
     SERVER = "🌐"
+    INFO = "ℹ️"
+    RELOAD = "🔄"
+    ID_CARD = "🆔"
+    
+    # Phone specific
+    PHONE = "📱"
+    ADDRESS = "🏠"
+    
+    # Vehicle specific
+    CAR = "🚗"
+    ENGINE = "🔧"
+    FUEL = "⛽"
+    FACTORY = "🏭"
+    MONEY = "💰"
+    PHONE_V = "📞"
+    CERTIFICATE = "📜"
+    BUILDING = "🏢"
+    GEAR = "⚙️"
+    CAR_DETAIL = "🚙"
+    GAS = "💨"
+    COMMERCIAL = "💼"
+    INSURANCE = "🏥"
+    
+    # Navigation
+    BACK = "↩️"
+    NEXT = "➡️"
+    PREV = "⬅️"
+    NEW = "🔄"
 
 # Create Flask app for keep-alive
 app = Flask(__name__)
@@ -94,18 +117,44 @@ def home():
                 border-radius: 10px;
                 margin: 10px 0;
             }}
+            .feature-grid {{
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 15px;
+                margin: 20px 0;
+            }}
+            .feature-item {{
+                background: rgba(255, 255, 255, 0.15);
+                padding: 15px;
+                border-radius: 8px;
+                text-align: center;
+            }}
         </style>
     </head>
     <body>
         <div class="container">
-            <h1>🚀 OSINT Pro Bot</h1>
+            <h1>🚀 OSINT Pro Master Bot</h1>
             <div class="status">🟢 ONLINE & RUNNING</div>
             
             <div class="info-box">
                 <h3>📊 Bot Information</h3>
                 <p><strong>Status:</strong> Active</p>
                 <p><strong>Uptime:</strong> {time.strftime('%Y-%m-%d %H:%M:%S')}</p>
-                <p><strong>Service:</strong> Telegram Number OSINT Bot</p>
+                <p><strong>Service:</strong> Advanced OSINT Intelligence Platform</p>
+            </div>
+            
+            <div class="info-box">
+                <h3>🌟 Available Features</h3>
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <h4>📱 Phone Intelligence</h4>
+                        <p>Complete mobile number analysis</p>
+                    </div>
+                    <div class="feature-item">
+                        <h4>🚗 Vehicle Intelligence</h4>
+                        <p>Detailed vehicle information</p>
+                    </div>
+                </div>
             </div>
             
             <div class="info-box">
@@ -127,7 +176,7 @@ def home():
 
 @app.route('/health')
 def health():
-    return {"status": "healthy", "timestamp": time.time(), "service": "osint_pro_bot"}
+    return {"status": "healthy", "timestamp": time.time(), "service": "osint_pro_master_bot"}
 
 def run_keep_alive():
     """Run the keep-alive server in a separate thread"""
@@ -139,34 +188,44 @@ async def start(update: Update, context: CallbackContext) -> None:
     user = update.effective_user
     
     welcome_text = f"""
-{Style.ROCKET} *WELCOME TO OSINT PRO BOT* {Style.ROCKET}
+{Style.ROCKET} *WELCOME TO OSINT PRO MASTER BOT* {Style.ROCKET}
 
 👋 Hello *{user.first_name}*!
 
-{Style.SEARCH} *Advanced Number Intelligence Platform*
+{Style.SEARCH} *Advanced Intelligence Platform*
 {Style.SHIELD} *Secure • Fast • Professional*
 
-✨ *Features:*
-• {Style.PHONE} Complete number analysis
-• {Style.USER} Detailed subscriber information  
-• {Style.LOCATION} Geographic mapping
-• {Style.DATABASE} Multi-source data verification
-• {Style.LOCK} Privacy protected
+✨ *Dual Intelligence Features:*
+
+{Style.PHONE} *Phone Intelligence:*
+• Complete number analysis
+• Detailed subscriber information  
+• Geographic mapping
+• Multi-source data verification
+
+{Style.CAR} *Vehicle Intelligence:*
+• Complete RC Information
+• Address Verification  
+• Technical Specifications
+• Insurance & Tax Details
 
 📋 *Quick Start:*
-Simply send any 10-digit mobile number to begin analysis.
+Choose your search type below or simply send:
+• *10-digit mobile number* for phone analysis
+• *Vehicle registration* for vehicle info
 
-*Formats Supported:*
-• `7044165702`
-• `+917044165702`
-• `917044165702`
+*Examples:*
+Phone: `7044165702`, `+917044165702`
+Vehicle: `UP32AB1234`, `DL1CAB1234`
 
 {Style.WARNING} *Legal Notice:* Use responsibly in compliance with applicable laws.
     """
     
     keyboard = [
+        [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search"),
+         InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
         [InlineKeyboardButton(f"{Style.HELP} Get Help", callback_data="help")],
-        [InlineKeyboardButton(f"{Style.SEARCH} Quick Example", callback_data="quick_example")]
+        [InlineKeyboardButton(f"{Style.SEARCH} Quick Examples", callback_data="quick_examples")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -186,17 +245,23 @@ Simply send any 10-digit mobile number to begin analysis.
 async def help_command(update: Update, context: CallbackContext) -> None:
     """Send help message."""
     help_text = f"""
-{Style.HELP} *OSINT PRO BOT - HELP GUIDE* {Style.HELP}
+{Style.HELP} *OSINT PRO MASTER BOT - HELP GUIDE* {Style.HELP}
 
 {Style.SEARCH} *How to Use:*
-1. {Style.PHONE} Send any mobile number
-2. {Style.LOADING} Wait for processing
-3. {Style.SUCCESS} Receive detailed report
+
+{Style.PHONE} *Phone Intelligence:*
+1. Send any mobile number
+2. Wait for processing
+3. Receive detailed report
+
+{Style.CAR} *Vehicle Intelligence:*
+1. Click Vehicle Search button
+2. Enter registration number
+3. Get instant results
 
 {Style.NETWORK} *Supported Formats:*
-• 10-digit numbers: `7044165702`
-• International: `+917044165702`
-• With country code: `917044165702`
+• *Phone:* 10-digit numbers, International format, With country code
+• *Vehicle:* UP32AB1234, DL1CAB1234, HR26DK7890
 
 {Style.SHIELD} *Security Features:*
 • Encrypted communication
@@ -210,12 +275,13 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 • Always verify information from multiple sources
 
 *Need immediate assistance?*
-Send any number to test the system now!
+Use the buttons below to start a search!
     """
     
     keyboard = [
-        [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")],
-        [InlineKeyboardButton(f"{Style.SEARCH} Try Example", callback_data="quick_example")]
+        [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search"),
+         InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
+        [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -232,9 +298,14 @@ Send any number to test the system now!
             parse_mode=ParseMode.MARKDOWN
         )
 
-async def show_loading(chat_id, context: CallbackContext):
+async def show_loading(chat_id, context: CallbackContext, search_type="request"):
     """Show single loading message."""
-    loading_text = f"{Style.LOADING} *Processing your request...*"
+    if search_type == "phone":
+        loading_text = f"{Style.LOADING} *Processing phone number...*"
+    elif search_type == "vehicle":
+        loading_text = f"{Style.LOADING} *Searching vehicle database...*"
+    else:
+        loading_text = f"{Style.LOADING} *Processing your request...*"
     
     message = await context.bot.send_message(
         chat_id=chat_id,
@@ -253,12 +324,106 @@ async def button_handler(update: Update, context: CallbackContext) -> None:
         await help_command(update, context)
     elif query.data == "main_menu":
         await start(update, context)
-    elif query.data == "quick_example":
-        await handle_phone_number(update, context, "7044165702")
+    elif query.data == "quick_examples":
+        await show_quick_examples(update, context)
+    elif query.data == "phone_search":
+        await phone_search_handler(update, context)
+    elif query.data == "vehicle_search":
+        await vehicle_search_handler(update, context)
     elif query.data == "new_search":
-        await query.edit_message_text(f"{Style.SEARCH} *Send new number to begin analysis...*", parse_mode=ParseMode.MARKDOWN)
+        await query.edit_message_text(f"{Style.SEARCH} *Choose search type or send input directly...*", parse_mode=ParseMode.MARKDOWN)
     elif query.data.startswith("page_"):
         await handle_pagination(update, context)
+    elif query.data.startswith("retry_"):
+        await retry_handler(update, context)
+
+async def show_quick_examples(update: Update, context: CallbackContext) -> None:
+    """Show quick examples for both services."""
+    examples_text = f"""
+{Style.SEARCH} *QUICK EXAMPLES*
+
+{Style.PHONE} *Phone Number Examples:*
+• `7044165702` - Standard 10-digit
+• `+917044165702` - International format
+• `917044165702` - With country code
+
+{Style.CAR} *Vehicle Number Examples:*
+• `UP32AB1234` - Uttar Pradesh
+• `DL1CAB1234` - Delhi
+• `HR26DK7890` - Haryana
+• `KA01AB1234` - Karnataka
+
+{Style.INFO} Simply send any of these formats to get started, or use the search buttons below.
+    """
+    
+    keyboard = [
+        [InlineKeyboardButton(f"{Style.PHONE} Try Phone Example", callback_data="try_phone_example"),
+         InlineKeyboardButton(f"{Style.CAR} Try Vehicle Example", callback_data="try_vehicle_example")],
+        [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.callback_query.edit_message_text(
+        examples_text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
+
+async def phone_search_handler(update: Update, context: CallbackContext) -> None:
+    """Handle phone search button."""
+    search_text = f"""
+{Style.PHONE} *PHONE NUMBER SEARCH*
+
+Please enter the mobile number:
+
+*Supported Formats:*
+• `7044165702`
+• `+917044165702`  
+• `917044165702`
+
+ℹ️ Enter the number with or without country code.
+    """
+    
+    await update.callback_query.edit_message_text(
+        search_text,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    context.user_data['expecting_phone'] = True
+    context.user_data['expecting_vehicle'] = False
+
+async def vehicle_search_handler(update: Update, context: CallbackContext) -> None:
+    """Handle vehicle search button."""
+    search_text = f"""
+{Style.CAR} *VEHICLE SEARCH*
+
+Please enter the vehicle registration number:
+
+*Examples:*
+• `UP32AB1234`
+• `DL1CAB1234`
+• `HR26DK7890`
+
+ℹ️ Enter the number without spaces.
+    """
+    
+    await update.callback_query.edit_message_text(
+        search_text,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    context.user_data['expecting_vehicle'] = True
+    context.user_data['expecting_phone'] = False
+
+async def try_phone_example(update: Update, context: CallbackContext) -> None:
+    """Try phone number example."""
+    await handle_phone_number(update, context, "7044165702")
+
+async def try_vehicle_example(update: Update, context: CallbackContext) -> None:
+    """Try vehicle number example."""
+    await handle_vehicle_search(update, context, "UP32AB1234")
+
+# ============================
+# PHONE NUMBER FUNCTIONALITY
+# ============================
 
 async def handle_pagination(update: Update, context: CallbackContext) -> None:
     """Handle pagination button clicks."""
@@ -349,14 +514,14 @@ async def handle_phone_number(update: Update, context: CallbackContext, number_i
     chat_id = update.effective_chat.id
     
     # Show single loading message
-    loading_message_id = await show_loading(chat_id, context)
+    loading_message_id = await show_loading(chat_id, context, "phone")
     
     # Clean the phone number
     clean_number = clean_phone_number(number_input)
     
     if len(clean_number) != 10:
         error_text = f"""
-{Style.ERROR} *Invalid Input*
+{Style.ERROR} *Invalid Phone Input*
 
 Please provide a valid 10-digit Indian mobile number.
 
@@ -368,7 +533,10 @@ Please provide a valid 10-digit Indian mobile number.
 {Style.WARNING} Ensure the number follows standard Indian mobile format.
         """
         
-        keyboard = [[InlineKeyboardButton(f"{Style.NEW} Try Again", callback_data="new_search")]]
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.PHONE} Try Again", callback_data="phone_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await context.bot.edit_message_text(
@@ -382,7 +550,7 @@ Please provide a valid 10-digit Indian mobile number.
     
     try:
         # Fetch data from API
-        response = requests.get(f"{API_URL}{clean_number}", timeout=20)
+        response = requests.get(f"{PHONE_API_URL}{clean_number}", timeout=20)
         response.raise_for_status()
         
         # Parse response
@@ -391,7 +559,7 @@ Please provide a valid 10-digit Indian mobile number.
         # Delete loading message
         await context.bot.delete_message(chat_id=chat_id, message_id=loading_message_id)
         
-        await process_and_send_results(update, context, clean_number, data)
+        await process_and_send_phone_results(update, context, clean_number, data)
             
     except requests.exceptions.Timeout:
         error_text = f"""
@@ -404,7 +572,7 @@ The data source is taking longer than expected to respond.
 
 {Style.WARNING} Please try again in a few moments.
         """
-        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        await send_error_message(update, context, error_text, clean_number, loading_message_id, "phone")
         
     except requests.exceptions.RequestException as e:
         error_text = f"""
@@ -417,7 +585,7 @@ Unable to connect to data sources at this time.
 
 {Style.WARNING} Please check your internet connection and try again.
         """
-        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        await send_error_message(update, context, error_text, clean_number, loading_message_id, "phone")
         
     except ValueError as e:
         error_text = f"""
@@ -430,7 +598,7 @@ Received unexpected response format from data source.
 
 {Style.WARNING} Our team has been notified. Please try again shortly.
         """
-        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        await send_error_message(update, context, error_text, clean_number, loading_message_id, "phone")
         
     except Exception as e:
         logger.error(f"Unexpected error: {e}")
@@ -444,12 +612,20 @@ An unexpected error occurred during processing.
 
 {Style.WARNING} Please try again in a few minutes.
         """
-        await send_error_message(update, context, error_text, clean_number, loading_message_id)
+        await send_error_message(update, context, error_text, clean_number, loading_message_id, "phone")
 
-async def send_error_message(update: Update, context: CallbackContext, error_text: str, number: str, loading_message_id: int = None):
+async def send_error_message(update: Update, context: CallbackContext, error_text: str, number: str, loading_message_id: int = None, search_type="phone"):
     """Send error message with retry button."""
+    if search_type == "phone":
+        retry_button = InlineKeyboardButton(f"{Style.PHONE} Retry Search", callback_data=f"retry_phone_{number}")
+        search_button = InlineKeyboardButton(f"{Style.PHONE} New Phone Search", callback_data="phone_search")
+    else:
+        retry_button = InlineKeyboardButton(f"{Style.CAR} Retry Search", callback_data=f"retry_vehicle_{number}")
+        search_button = InlineKeyboardButton(f"{Style.CAR} New Vehicle Search", callback_data="vehicle_search")
+    
     keyboard = [
-        [InlineKeyboardButton(f"{Style.NEW} Retry Search", callback_data=f"retry_{number}")],
+        [retry_button],
+        [search_button],
         [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -478,7 +654,7 @@ async def send_error_message(update: Update, context: CallbackContext, error_tex
                 parse_mode=ParseMode.MARKDOWN
             )
 
-async def process_and_send_results(update: Update, context: CallbackContext, number: str, data: dict) -> None:
+async def process_and_send_phone_results(update: Update, context: CallbackContext, number: str, data: dict) -> None:
     """Process API results and send with pagination."""
     
     if 'data' in data and data['data']:
@@ -513,7 +689,7 @@ async def process_and_send_results(update: Update, context: CallbackContext, num
         else:
             # No valid records found
             result_text = f"""
-{Style.SEARCH} *INTELLIGENCE REPORT*
+{Style.SEARCH} *PHONE INTELLIGENCE REPORT*
 
 {Style.PHONE} *Target Number:* `{number}`
 {Style.WARNING} *Status:* Data Retrieved - No Valid Records
@@ -525,7 +701,7 @@ The number was processed successfully, but no actionable intelligence was found 
             """
             
             keyboard = [
-                [InlineKeyboardButton(f"{Style.NEW} New Analysis", callback_data="new_search")],
+                [InlineKeyboardButton(f"{Style.PHONE} New Phone Search", callback_data="phone_search")],
                 [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
@@ -546,7 +722,7 @@ The number was processed successfully, but no actionable intelligence was found 
     else:
         # No data found
         result_text = f"""
-{Style.SEARCH} *INTELLIGENCE REPORT*
+{Style.SEARCH} *PHONE INTELLIGENCE REPORT*
 
 {Style.PHONE} *Target Number:* `{number}`
 {Style.WARNING} *Status:* No Database Records Found
@@ -562,7 +738,7 @@ This number does not appear in our current intelligence databases. This could in
         """
         
         keyboard = [
-            [InlineKeyboardButton(f"{Style.NEW} New Analysis", callback_data="new_search")],
+            [InlineKeyboardButton(f"{Style.PHONE} New Phone Search", callback_data="phone_search")],
             [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -595,7 +771,7 @@ async def send_record_page(update: Update, context: CallbackContext, records: li
     
     # Format the result with professional styling
     result_text = f"""
-{Style.SEARCH} *INTELLIGENCE REPORT* {Style.BOLD}
+{Style.SEARCH} *PHONE INTELLIGENCE REPORT* {Style.BOLD}
 
 {Style.PHONE} *Target Number:* `{number}`
 {Style.DOCUMENT} *Record:* {page_num + 1} of {total_pages}
@@ -636,7 +812,8 @@ async def send_record_page(update: Update, context: CallbackContext, records: li
     
     # Action buttons
     action_buttons = [
-        InlineKeyboardButton(f"{Style.NEW} New Analysis", callback_data="new_search"),
+        InlineKeyboardButton(f"{Style.PHONE} New Phone Search", callback_data="phone_search"),
+        InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search"),
         InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")
     ]
     keyboard.append(action_buttons)
@@ -670,34 +847,390 @@ async def retry_handler(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
     await query.answer()
     
-    number = query.data.replace('retry_', '')
-    await handle_phone_number(update, context, number)
+    data = query.data
+    if data.startswith('retry_phone_'):
+        number = data.replace('retry_phone_', '')
+        await handle_phone_number(update, context, number)
+    elif data.startswith('retry_vehicle_'):
+        number = data.replace('retry_vehicle_', '')
+        await handle_vehicle_search(update, context, number)
+
+# ============================
+# VEHICLE FUNCTIONALITY
+# ============================
+
+def clean_vehicle_number(number: str) -> str:
+    """Clean and validate vehicle number."""
+    cleaned = number.upper().strip()
+    # Remove spaces and special characters, keep alphanumeric
+    cleaned = ''.join(c for c in cleaned if c.isalnum())
+    return cleaned
+
+def get_vehicle_info(vehicle_number):
+    """Fetch vehicle information from both APIs"""
+    results = {}
+    
+    # API 1 - RC Information
+    try:
+        logger.info(f"Calling Vehicle API1: {VEHICLE_API1_URL}{vehicle_number}")
+        api1_response = requests.get(f"{VEHICLE_API1_URL}{vehicle_number}", timeout=15)
+        if api1_response.status_code == 200:
+            results['api1'] = api1_response.json()
+        else:
+            results['api1'] = {"error": f"API1 HTTP {api1_response.status_code}"}
+    except Exception as e:
+        results['api1'] = {"error": f"API1 Error: {str(e)}"}
+    
+    # API 2 - Detailed Information  
+    try:
+        logger.info(f"Calling Vehicle API2: {VEHICLE_API2_URL}{vehicle_number}")
+        api2_response = requests.get(f"{VEHICLE_API2_URL}{vehicle_number}", timeout=15)
+        if api2_response.status_code == 200:
+            results['api2'] = api2_response.json()
+        else:
+            results['api2'] = {"error": f"API2 HTTP {api2_response.status_code}"}
+    except Exception as e:
+        results['api2'] = {"error": f"API2 Error: {str(e)}"}
+    
+    return results
+
+def format_vehicle_results(vehicle_number, results):
+    """Format the vehicle information results with ALL fields"""
+    
+    result_text = f"""
+{Style.CAR} *VEHICLE INTELLIGENCE REPORT*
+
+*Registration Number:* `{vehicle_number}`
+*Report Time:* {time.strftime('%Y-%m-%d %H:%M:%S')}
+
+────────────────────
+    """
+    
+    # API 1 Results - Complete Fields
+    api1_data = results.get('api1', {})
+    if 'error' in api1_data:
+        result_text += f"\n{Style.ERROR} *RC Information:* {api1_data['error']}\n"
+    else:
+        result_text += f"\n{Style.DOCUMENT} *RC INFORMATION*\n\n"
+        data = api1_data
+        
+        # All API1 fields with proper formatting
+        api1_fields = [
+            (f"{Style.ID_CARD} RC Number", data.get('rc_number')),
+            (f"{Style.USER} Owner Name", data.get('owner_name')),
+            (f"{Style.FATHER} Father Name", data.get('father_name')),
+            (f"🔢 Owner Serial No", data.get('owner_serial_no')),
+            (f"{Style.FACTORY} Model Name", data.get('model_name')),
+            (f"{Style.CAR} Maker Model", data.get('maker_model')),
+            (f"📋 Vehicle Class", data.get('vehicle_class')),
+            (f"{Style.FUEL} Fuel Type", data.get('fuel_type')),
+            (f"{Style.GAS} Fuel Norms", data.get('fuel_norms')),
+            (f"{Style.CALENDAR} Registration Date", data.get('registration_date')),
+            (f"{Style.INSURANCE} Insurance Company", data.get('insurance_company')),
+            (f"📄 Insurance No", data.get('insurance_no')),
+            (f"{Style.SHIELD} Insurance Expiry", data.get('insurance_expiry')),
+            (f"{Style.SHIELD} Insurance Upto", data.get('insurance_upto')),
+            (f"{Style.CERTIFICATE} Fitness Upto", data.get('fitness_upto')),
+            (f"{Style.MONEY} Tax Upto", data.get('tax_upto')),
+            (f"🛂 PUC No", data.get('puc_no')),
+            (f"🛂 PUC Upto", data.get('puc_upto')),
+            (f"💰 Financier Name", data.get('financier_name')),
+            (f"{Style.BUILDING} RTO", data.get('rto')),
+            (f"{Style.LOCATION} Address", data.get('address')),
+            (f"🏙️ City", data.get('city')),
+            (f"{Style.PHONE_V} Phone", data.get('phone'))
+        ]
+        
+        for label, value in api1_fields:
+            if value and str(value).strip() and str(value).lower() not in ['n/a', 'null', 'none', '']:
+                result_text += f"• {label}: `{value}`\n"
+    
+    result_text += "\n────────────────────\n"
+    
+    # API 2 Results - Complete Fields
+    api2_data = results.get('api2', {})
+    if 'error' in api2_data:
+        result_text += f"\n{Style.ERROR} *Detailed Info:* {api2_data['error']}\n"
+    else:
+        result_text += f"\n{Style.INFO} *DETAILED INFORMATION*\n\n"
+        data = api2_data
+        
+        # All API2 fields with proper formatting
+        api2_fields = [
+            (f"🔢 Asset Number", data.get('asset_number')),
+            (f"{Style.CAR} Asset Type", data.get('asset_type')),
+            (f"{Style.CALENDAR} Registration Year", data.get('registration_year')),
+            (f"{Style.CALENDAR} Registration Month", data.get('registration_month')),
+            (f"{Style.CAR_DETAIL} Make Model", data.get('make_model')),
+            (f"📋 Vehicle Type", data.get('vehicle_type')),
+            (f"{Style.FACTORY} Make Name", data.get('make_name')),
+            (f"{Style.FUEL} Fuel Type", data.get('fuel_type')),
+            (f"{Style.ENGINE} Engine Number", data.get('engine_number')),
+            (f"{Style.USER} Owner Name", data.get('owner_name')),
+            (f"🆔 Chassis Number", data.get('chassis_number')),
+            (f"🏢 Previous Insurer", data.get('previous_insurer')),
+            (f"{Style.SHIELD} Previous Policy Expiry", data.get('previous_policy_expiry_date')),
+            (f"{Style.COMMERCIAL} Is Commercial", data.get('is_commercial')),
+            (f"📋 Vehicle Type V2", data.get('vehicle_type_v2')),
+            (f"{Style.GEAR} Vehicle Type Processed", data.get('vehicle_type_processed')),
+            (f"{Style.LOCATION} Permanent Address", data.get('permanent_address')),
+            (f"📍 Present Address", data.get('present_address')),
+            (f"{Style.CALENDAR} Registration Date", data.get('registration_date')),
+            (f"{Style.BUILDING} Registration Address", data.get('registration_address')),
+            (f"{Style.CAR} Model Name", data.get('model_name')),
+            (f"{Style.FACTORY} Make Name 2", data.get('make_name2')),
+            (f"{Style.CAR} Model Name 2", data.get('model_name2')),
+            (f"🆔 Variant ID", data.get('variant_id')),
+            (f"{Style.SHIELD} Previous Policy Expired", data.get('previous_policy_expired'))
+        ]
+        
+        for label, value in api2_fields:
+            if value is not None and str(value).strip() and str(value).lower() not in ['n/a', 'null', 'none', '']:
+                # Handle boolean values
+                if isinstance(value, bool):
+                    value = "Yes" if value else "No"
+                # Handle list values
+                elif isinstance(value, list):
+                    value = ', '.join(str(v) for v in value)
+                result_text += f"• {label}: `{value}`\n"
+    
+    result_text += f"\n{Style.SHIELD} *Data Source:* Verified Vehicle Databases"
+    result_text += f"\n{Style.INFO} *Note:* Some fields may be empty if not available in database"
+    
+    return result_text
+
+async def handle_vehicle_search(update: Update, context: CallbackContext, vehicle_input: str = None) -> None:
+    """Handle vehicle number input from user"""
+    
+    if vehicle_input is None:
+        if update.message:
+            vehicle_input = update.message.text
+        else:
+            return
+    
+    # Clean the vehicle number
+    vehicle_number = clean_vehicle_number(vehicle_input)
+    
+    # Basic validation
+    if len(vehicle_number) < 5:
+        error_text = f"""
+{Style.ERROR} *Invalid Vehicle Number!*
+
+Please enter a valid registration number (minimum 5 characters).
+
+*Examples:*
+• `UP32AB1234`
+• `DL1CAB1234`
+• `HR26DK7890`
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.CAR} Try Again", callback_data="vehicle_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.message:
+            await update.message.reply_text(
+                error_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.callback_query.edit_message_text(
+                error_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        return
+    
+    chat_id = update.effective_chat.id
+    
+    # Send processing message
+    loading_message_id = await show_loading(chat_id, context, "vehicle")
+    
+    try:
+        # Get vehicle information
+        logger.info(f"Fetching info for vehicle: {vehicle_number}")
+        results = get_vehicle_info(vehicle_number)
+        
+        # Format and send results
+        result_text = format_vehicle_results(vehicle_number, results)
+        
+        # Delete processing message
+        await context.bot.delete_message(
+            chat_id=chat_id,
+            message_id=loading_message_id
+        )
+        
+        # Create keyboard for navigation
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.CAR} New Vehicle Search", callback_data="vehicle_search")],
+            [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send result - Telegram has 4096 character limit, so we need to check
+        if len(result_text) > 4096:
+            # Split the message if too long
+            parts = []
+            while result_text:
+                if len(result_text) > 4096:
+                    part = result_text[:4096]
+                    # Find the last newline to avoid cutting in the middle of a line
+                    last_newline = part.rfind('\n')
+                    if last_newline != -1:
+                        part = result_text[:last_newline]
+                        result_text = result_text[last_newline+1:]
+                    else:
+                        result_text = result_text[4096:]
+                    parts.append(part)
+                else:
+                    parts.append(result_text)
+                    break
+            
+            # Send first part with keyboard
+            if update.message:
+                await update.message.reply_text(
+                    parts[0],
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                await update.callback_query.edit_message_text(
+                    parts[0],
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            
+            # Send remaining parts without keyboard
+            for part in parts[1:]:
+                if update.message:
+                    await update.message.reply_text(
+                        part,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                else:
+                    # For callback queries, we can only edit the original message once
+                    # So we send new messages for additional parts
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=part,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+        else:
+            # Send normally if within limit
+            if update.message:
+                await update.message.reply_text(
+                    result_text,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+            else:
+                await update.callback_query.edit_message_text(
+                    result_text,
+                    reply_markup=reply_markup,
+                    parse_mode=ParseMode.MARKDOWN
+                )
+        
+        logger.info(f"Successfully sent results for vehicle: {vehicle_number}")
+        
+    except Exception as e:
+        logger.error(f"Error processing vehicle {vehicle_number}: {str(e)}")
+        
+        # Update processing message with error
+        error_text = f"""
+{Style.ERROR} *Vehicle Search Failed*
+
+Unable to retrieve information for `{vehicle_number}`.
+
+*Possible reasons:*
+• Vehicle number not found in databases
+• Temporary service outage
+• Invalid registration number
+
+{Style.WARNING} Please try again with a different number.
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.CAR} Try Again", callback_data="vehicle_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=loading_message_id,
+            text=error_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
+    
+    # Clear the expecting state
+    context.user_data['expecting_vehicle'] = False
+
+# ============================
+# MAIN MESSAGE HANDLER
+# ============================
 
 async def handle_message(update: Update, context: CallbackContext) -> None:
     """Handle all other messages."""
     text = update.message.text
     
-    # Check if message looks like a phone number
-    cleaned_text = text.replace(' ', '').replace('+', '').replace('-', '')
-    if any(char.isdigit() for char in cleaned_text) and len(cleaned_text) >= 10:
+    # Check if user is expecting specific input
+    if context.user_data.get('expecting_phone', False):
         await handle_phone_number(update, context)
-    else:
-        help_text = f"""
-{Style.ERROR} *Invalid Input*
+        return
+    elif context.user_data.get('expecting_vehicle', False):
+        await handle_vehicle_search(update, context)
+        return
+    
+    # Auto-detect input type
+    cleaned_phone = clean_phone_number(text)
+    cleaned_vehicle = clean_vehicle_number(text)
+    
+    # Check if it's a phone number (10 digits after cleaning)
+    if len(cleaned_phone) == 10:
+        await handle_phone_number(update, context)
+        return
+    
+    # Check if it's a vehicle number (alphanumeric, 5-15 chars, contains letters)
+    if 5 <= len(cleaned_vehicle) <= 15 and any(c.isalpha() for c in cleaned_vehicle):
+        await handle_vehicle_search(update, context)
+        return
+    
+    # If we can't determine, show help
+    help_text = f"""
+{Style.INFO} *OSINT Pro Master Bot*
 
-Please send a valid mobile number for analysis.
+I can help you with both phone and vehicle intelligence.
 
-{Style.SEARCH} *Supported Formats:*
+*For Phone Analysis:*
+Send a 10-digit mobile number like:
 • `7044165702`
 • `+917044165702`
-• `917044165702`
 
-{Style.HELP} Type /help for complete usage instructions.
-        """
-        await update.message.reply_text(
-            help_text,
-            parse_mode=ParseMode.MARKDOWN
-        )
+*For Vehicle Analysis:*
+Send a vehicle registration like:
+• `UP32AB1234`
+• `DL1CAB1234`
+
+Or use the buttons below to choose your search type.
+    """
+    
+    keyboard = [
+        [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search"),
+         InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
+        [InlineKeyboardButton(f"{Style.HELP} Help", callback_data="help")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        help_text,
+        reply_markup=reply_markup,
+        parse_mode=ParseMode.MARKDOWN
+    )
 
 def main() -> None:
     """Start the bot and keep-alive server."""
@@ -713,15 +1246,21 @@ def main() -> None:
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    application.add_handler(CallbackQueryHandler(button_handler, pattern="^(help|main_menu|quick_example|new_search)$"))
+    
+    # Callback query handlers
+    application.add_handler(CallbackQueryHandler(button_handler, pattern="^(help|main_menu|quick_examples|phone_search|vehicle_search|new_search)$"))
+    application.add_handler(CallbackQueryHandler(try_phone_example, pattern="^try_phone_example$"))
+    application.add_handler(CallbackQueryHandler(try_vehicle_example, pattern="^try_vehicle_example$"))
     application.add_handler(CallbackQueryHandler(retry_handler, pattern="^retry_"))
     application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^page_"))
     
     # Start the Bot with enhanced logging
-    print("🚀 OSINT PRO BOT - Starting Services...")
+    print("🚀 OSINT PRO MASTER BOT - Starting Services...")
     print("=" * 50)
     print(f"{Style.SERVER} Keep-Alive Server: http://0.0.0.0:{KEEP_ALIVE_PORT}")
     print(f"{Style.ROCKET} Telegram Bot: @osint_pro_number_bot")
+    print(f"{Style.PHONE} Phone Intelligence: ACTIVE")
+    print(f"{Style.CAR} Vehicle Intelligence: ACTIVE")
     print(f"{Style.SHIELD} Status: ONLINE & MONITORING")
     print("=" * 50)
     print("Press Ctrl+C to stop all services")
