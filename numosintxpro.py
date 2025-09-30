@@ -2,6 +2,8 @@ import logging
 import requests
 import json
 import time
+import threading
+from flask import Flask
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext, CallbackQueryHandler
 from telegram.constants import ParseMode
@@ -9,6 +11,9 @@ from telegram.constants import ParseMode
 # Bot Configuration
 BOT_TOKEN = "8116705267:AAHVoyKFuX2Jrt0jHrP4nyIeq-YKvbSjCQs"
 API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
+
+# Keep Alive Server Configuration
+KEEP_ALIVE_PORT = 8080
 
 # Enable logging
 logging.basicConfig(
@@ -48,6 +53,86 @@ class Style:
     CALENDAR = "📅"
     CLOCK = "⏰"
     HOME = "🏠"
+    SERVER = "🌐"
+
+# Create Flask app for keep-alive
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>OSINT Pro Bot - Status</title>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                max-width: 800px;
+                margin: 0 auto;
+                padding: 20px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }}
+            .container {{
+                background: rgba(255, 255, 255, 0.1);
+                padding: 30px;
+                border-radius: 15px;
+                backdrop-filter: blur(10px);
+            }}
+            .status {{
+                background: green;
+                color: white;
+                padding: 10px 20px;
+                border-radius: 20px;
+                display: inline-block;
+                font-weight: bold;
+            }}
+            .info-box {{
+                background: rgba(255, 255, 255, 0.2);
+                padding: 15px;
+                border-radius: 10px;
+                margin: 10px 0;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🚀 OSINT Pro Bot</h1>
+            <div class="status">🟢 ONLINE & RUNNING</div>
+            
+            <div class="info-box">
+                <h3>📊 Bot Information</h3>
+                <p><strong>Status:</strong> Active</p>
+                <p><strong>Uptime:</strong> {time.strftime('%Y-%m-%d %H:%M:%S')}</p>
+                <p><strong>Service:</strong> Telegram Number OSINT Bot</p>
+            </div>
+            
+            <div class="info-box">
+                <h3>🌐 Keep Alive Server</h3>
+                <p>This server keeps the bot running 24/7</p>
+                <p><strong>Port:</strong> {KEEP_ALIVE_PORT}</p>
+                <p><strong>Endpoint:</strong> / (this page)</p>
+            </div>
+            
+            <div class="info-box">
+                <h3>📞 Contact Bot</h3>
+                <p>Search for <strong>@osint_pro_number_bot</strong> on Telegram</p>
+                <p>Or click: <a href="https://t.me/osint_pro_number_bot" style="color: #4FC3F7;">Start Chat</a></p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/health')
+def health():
+    return {"status": "healthy", "timestamp": time.time(), "service": "osint_pro_bot"}
+
+def run_keep_alive():
+    """Run the keep-alive server in a separate thread"""
+    print(f"{Style.SERVER} Starting keep-alive server on port {KEEP_ALIVE_PORT}...")
+    app.run(host='0.0.0.0', port=KEEP_ALIVE_PORT, debug=False, use_reloader=False)
 
 async def start(update: Update, context: CallbackContext) -> None:
     """Send welcome message when the command /start is issued."""
@@ -615,8 +700,13 @@ Please send a valid mobile number for analysis.
         )
 
 def main() -> None:
-    """Start the bot."""
-    # Create Application
+    """Start the bot and keep-alive server."""
+    
+    # Start keep-alive server in a separate thread
+    keep_alive_thread = threading.Thread(target=run_keep_alive, daemon=True)
+    keep_alive_thread.start()
+    
+    # Create Telegram Bot Application
     application = Application.builder().token(BOT_TOKEN).build()
 
     # Add handlers
@@ -627,18 +717,26 @@ def main() -> None:
     application.add_handler(CallbackQueryHandler(retry_handler, pattern="^retry_"))
     application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^page_"))
     
-    # Start the Bot
-    print("🚀 OSINT PRO BOT is running...")
-    print("⭐ Professional Number Intelligence Platform")
-    print("📡 Monitoring for incoming requests...")
-    print("Press Ctrl+C to stop")
+    # Start the Bot with enhanced logging
+    print("🚀 OSINT PRO BOT - Starting Services...")
+    print("=" * 50)
+    print(f"{Style.SERVER} Keep-Alive Server: http://0.0.0.0:{KEEP_ALIVE_PORT}")
+    print(f"{Style.ROCKET} Telegram Bot: @osint_pro_number_bot")
+    print(f"{Style.SHIELD} Status: ONLINE & MONITORING")
+    print("=" * 50)
+    print("Press Ctrl+C to stop all services")
     
     try:
-        application.run_polling()
+        # Start polling with better error handling
+        application.run_polling(
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True
+        )
     except Exception as e:
         logger.error(f"Bot error: {e}")
-    print("⏹️ Bot service stopped.")
+        print(f"{Style.ERROR} Bot service stopped due to error: {e}")
+    finally:
+        print("⏹️ All services stopped.")
 
 if __name__ == '__main__':
-
     main()
