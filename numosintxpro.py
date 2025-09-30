@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode
 
 # Bot Configuration
-BOT_TOKEN = "8116705267:AAFM_Hkxv9BjVMzdv-D_k6XVUTAZbbOGalI"
+BOT_TOKEN = "8116705267:AAHVoyKFuX2Jrt0jHrP4nyIeq-YKvbSjCQs"
 API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
 
 # Enable logging
@@ -640,4 +640,5 @@ def main() -> None:
     print("⏹️ Bot service stopped.")
 
 if __name__ == '__main__':
+
     main()
