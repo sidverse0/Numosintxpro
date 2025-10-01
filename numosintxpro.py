@@ -243,7 +243,7 @@ Choose your search type below or simply send:
 *Examples:*
 Phone: `7044165702`, `+917044165702`
 Vehicle: `UP32AB1234`, `DL1CAB1234`
-IFSC: `SBIN0003010`, `HDFC0001234`
+IFSC: `SBIN0003010`, `HDFC0000001`
 
 {Style.WARNING} *Legal Notice:* Use responsibly in compliance with applicable laws.
     """
@@ -295,7 +295,7 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 {Style.NETWORK} *Supported Formats:*
 • *Phone:* 10-digit numbers, International format, With country code
 • *Vehicle:* UP32AB1234, DL1CAB1234, HR26DK7890
-• *IFSC:* SBIN0003010, HDFC0001234, ICIC0000001
+• *IFSC:* SBIN0003010, HDFC0000001, ICIC0000001
 
 {Style.SHIELD} *Security Features:*
 • Encrypted communication
@@ -394,7 +394,7 @@ async def show_quick_examples(update: Update, context: CallbackContext) -> None:
 
 {Style.BANK} *IFSC Code Examples:*
 • `SBIN0003010` - State Bank of India
-• `HDFC0001234` - HDFC Bank
+• `HDFC0000001` - HDFC Bank
 • `ICIC0000001` - ICICI Bank
 • `PNB0012000` - Punjab National Bank
 
@@ -470,7 +470,7 @@ Please enter the IFSC code:
 
 *Examples:*
 • `SBIN0003010` - State Bank of India
-• `HDFC0001234` - HDFC Bank
+• `HDFC0000001` - HDFC Bank
 • `ICIC0000001` - ICICI Bank
 
 ℹ️ IFSC code is 11 characters (4 letters + 7 digits/letters)
@@ -1254,7 +1254,7 @@ Unable to retrieve information for `{vehicle_number}`.
     context.user_data['expecting_vehicle'] = False
 
 # ============================
-# IFSC CODE FUNCTIONALITY
+# IFSC CODE FUNCTIONALITY - FIXED VERSION
 # ============================
 
 def clean_ifsc_code(ifsc_code: str) -> str:
@@ -1265,29 +1265,69 @@ def clean_ifsc_code(ifsc_code: str) -> str:
     return cleaned
 
 def get_ifsc_info(ifsc_code):
-    """Fetch IFSC code information from API"""
+    """Fetch IFSC code information from API with proper error handling"""
     try:
         logger.info(f"Calling IFSC API: {IFSC_API_URL}{ifsc_code}")
         response = requests.get(f"{IFSC_API_URL}{ifsc_code}", timeout=15)
+        
+        # Check if response is successful
         if response.status_code == 200:
-            return response.json()
+            try:
+                data = response.json()
+                # Check if the response contains valid data (not empty or error)
+                if data and isinstance(data, dict):
+                    # Check if we have at least basic bank information
+                    if data.get('BANK') or data.get('BRANCH'):
+                        return {"success": True, "data": data}
+                    else:
+                        return {"success": False, "error": "IFSC code exists but contains incomplete data"}
+                else:
+                    return {"success": False, "error": "Invalid response format from API"}
+            except json.JSONDecodeError:
+                return {"success": False, "error": "Invalid JSON response from API"}
+        elif response.status_code == 404:
+            return {"success": False, "error": "IFSC code not found in database"}
         else:
-            return {"error": f"API HTTP {response.status_code}"}
+            return {"success": False, "error": f"API returned HTTP {response.status_code}"}
+            
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Request timeout - API took too long to respond"}
+    except requests.exceptions.ConnectionError:
+        return {"success": False, "error": "Connection error - Unable to reach IFSC API"}
+    except requests.exceptions.RequestException as e:
+        return {"success": False, "error": f"Network error: {str(e)}"}
     except Exception as e:
-        return {"error": f"API Error: {str(e)}"}
+        logger.error(f"Unexpected error in IFSC lookup: {e}")
+        return {"success": False, "error": f"Unexpected error: {str(e)}"}
 
 def format_ifsc_results(ifsc_code, data):
-    """Format the IFSC information results"""
+    """Format the IFSC information results with enhanced error handling"""
     
-    if 'error' in data:
+    if not data.get('success', False):
+        error_msg = data.get('error', 'Unknown error occurred')
         return f"""
 {Style.ERROR} *IFSC LOOKUP FAILED*
 
-*IFSC Code:* `{ifsc_code}`
-*Error:* {data['error']}
+{Style.IFSC} *IFSC Code:* `{ifsc_code}`
+{Style.ERROR} *Error:* {error_msg}
 
-{Style.WARNING} Please check the IFSC code and try again.
+{Style.WARNING} *Possible Solutions:*
+• Verify the IFSC code is correct
+• Try a different IFSC code
+• Check your internet connection
+• Try again in a few minutes
+
+*Valid IFSC Examples:*
+• `SBIN0003010` - State Bank of India
+• `HDFC0000001` - HDFC Bank
+• `ICIC0000001` - ICICI Bank
         """
+    
+    bank_data = data['data']
+    
+    # Format boolean values for services
+    def format_bool(value):
+        return '✅ Yes' if value else '❌ No'
     
     result_text = f"""
 {Style.BANK} *BANK IFSC DETAILS REPORT*
@@ -1298,36 +1338,36 @@ def format_ifsc_results(ifsc_code, data):
 ────────────────────
 
 {Style.BANK} *BANK INFORMATION*
-{Style.BANK} *Bank Name:* {data.get('BANK', 'N/A')}
-{Style.ID_CARD} *Bank Code:* {data.get('BANKCODE', 'N/A')}
+{Style.BANK} *Bank Name:* `{bank_data.get('BANK', 'N/A')}`
+{Style.ID_CARD} *Bank Code:* `{bank_data.get('BANKCODE', 'N/A')}`
 
 {Style.BRANCH} *BRANCH DETAILS*
-{Style.BRANCH} *Branch Name:* {data.get('BRANCH', 'N/A')}
-{Style.MICR} *MICR Code:* {data.get('MICR', 'N/A')}
-{Style.CONTACT} *Contact:* {data.get('CONTACT', 'N/A') if data.get('CONTACT') else 'Not Available'}
+{Style.BRANCH} *Branch Name:* `{bank_data.get('BRANCH', 'N/A')}`
+{Style.MICR} *MICR Code:* `{bank_data.get('MICR', 'N/A')}`
+{Style.CONTACT} *Contact:* `{bank_data.get('CONTACT', 'Not Available')}`
 
 {Style.LOCATION} *LOCATION INFORMATION*
-{Style.LOCATION} *Address:* {data.get('ADDRESS', 'N/A')}
-{Style.DISTRICT} *District:* {data.get('DISTRICT', 'N/A')}
-{Style.CITY} *City:* {data.get('CITY', 'N/A')}
-{Style.STATE} *State:* {data.get('STATE', 'N/A')}
-{Style.CENTRE} *Centre:* {data.get('CENTRE', 'N/A')}
+{Style.LOCATION} *Address:* `{bank_data.get('ADDRESS', 'N/A')}`
+{Style.DISTRICT} *District:* `{bank_data.get('DISTRICT', 'N/A')}`
+{Style.CITY} *City:* `{bank_data.get('CITY', 'N/A')}`
+{Style.STATE} *State:* `{bank_data.get('STATE', 'N/A')}`
+{Style.CENTRE} *Centre:* `{bank_data.get('CENTRE', 'N/A')}`
 
 {Style.NETWORK} *BANKING SERVICES*
-{Style.UPI} *UPI:* {'✅ Available' if data.get('UPI') else '❌ Not Available'}
-{Style.RTGS} *RTGS:* {'✅ Available' if data.get('RTGS') else '❌ Not Available'}
-{Style.NEFT} *NEFT:* {'✅ Available' if data.get('NEFT') else '❌ Not Available'}
-{Style.IMPS} *IMPS:* {'✅ Available' if data.get('IMPS') else '❌ Not Available'}
-{Style.SWIFT} *SWIFT:* {data.get('SWIFT', 'N/A') if data.get('SWIFT') else 'Not Available'}
+{Style.UPI} *UPI:* {format_bool(bank_data.get('UPI', False))}
+{Style.RTGS} *RTGS:* {format_bool(bank_data.get('RTGS', False))}
+{Style.NEFT} *NEFT:* {format_bool(bank_data.get('NEFT', False))}
+{Style.IMPS} *IMPS:* {format_bool(bank_data.get('IMPS', False))}
+{Style.SWIFT} *SWIFT:* `{bank_data.get('SWIFT', 'Not Available')}`
 
 {Style.SHIELD} *Data Source:* Razorpay IFSC API
-{Style.INFO} *Note:* Some information may not be available for all banks
+{Style.INFO} *Note:* Information provided by official banking sources
     """
     
     return result_text
 
 async def handle_ifsc_search(update: Update, context: CallbackContext, ifsc_input: str = None) -> None:
-    """Handle IFSC code input from user"""
+    """Handle IFSC code input from user with enhanced error handling"""
     
     if ifsc_input is None:
         if update.message:
@@ -1338,20 +1378,54 @@ async def handle_ifsc_search(update: Update, context: CallbackContext, ifsc_inpu
     # Clean the IFSC code
     ifsc_code = clean_ifsc_code(ifsc_input)
     
-    # Basic validation - IFSC should be 11 characters alphanumeric
-    if len(ifsc_code) != 11 or not ifsc_code[:4].isalpha() or not ifsc_code[4:].isalnum():
+    # Enhanced validation - IFSC should be 11 characters alphanumeric
+    if len(ifsc_code) != 11:
         error_text = f"""
-{Style.ERROR} *Invalid IFSC Code!*
+{Style.ERROR} *Invalid IFSC Code Length!*
 
-Please enter a valid 11-character IFSC code.
+IFSC code must be exactly 11 characters long.
 
-*Format:* 4 letters + 7 digits/letters
-*Examples:*
+*Your Input:* `{ifsc_code}` ({len(ifsc_code)} characters)
+*Required:* 11 characters (4 letters + 7 digits/letters)
+
+*Valid Examples:*
 • `SBIN0003010` - State Bank of India
-• `HDFC0001234` - HDFC Bank
+• `HDFC0000001` - HDFC Bank
 • `ICIC0000001` - ICICI Bank
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.BANK} Try Again", callback_data="ifsc_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.message:
+            await update.message.reply_text(
+                error_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.callback_query.edit_message_text(
+                error_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        return
+    
+    # Validate format: first 4 characters should be letters
+    if not ifsc_code[:4].isalpha():
+        error_text = f"""
+{Style.ERROR} *Invalid IFSC Code Format!*
 
-{Style.WARNING} IFSC code must follow the standard format.
+First 4 characters must be letters (bank code).
+
+*Your Input:* `{ifsc_code}`
+*Problem:* First 4 characters `{ifsc_code[:4]}` are not all letters
+
+*Valid Format:* 4 letters + 7 digits/letters
+*Example:* `SBIN0003010` (SBIN = State Bank of India)
         """
         
         keyboard = [
@@ -1380,12 +1454,12 @@ Please enter a valid 11-character IFSC code.
     loading_message_id = await show_loading(chat_id, context, "ifsc")
     
     try:
-        # Get IFSC information
+        # Get IFSC information with enhanced error handling
         logger.info(f"Fetching info for IFSC: {ifsc_code}")
-        results = get_ifsc_info(ifsc_code)
+        result = get_ifsc_info(ifsc_code)
         
         # Format and send results
-        result_text = format_ifsc_results(ifsc_code, results)
+        result_text = format_ifsc_results(ifsc_code, result)
         
         # Delete processing message
         await context.bot.delete_message(
@@ -1416,23 +1490,29 @@ Please enter a valid 11-character IFSC code.
                 parse_mode=ParseMode.MARKDOWN
             )
         
-        logger.info(f"Successfully sent results for IFSC: {ifsc_code}")
+        logger.info(f"Successfully processed IFSC request: {ifsc_code}")
         
     except Exception as e:
-        logger.error(f"Error processing IFSC {ifsc_code}: {str(e)}")
+        logger.error(f"Unexpected error processing IFSC {ifsc_code}: {str(e)}")
         
-        # Update processing message with error
+        # Update processing message with comprehensive error
         error_text = f"""
-{Style.ERROR} *IFSC Search Failed*
+{Style.ERROR} *System Error*
 
-Unable to retrieve information for `{ifsc_code}`.
+An unexpected error occurred while processing your IFSC code.
 
-*Possible reasons:*
-• IFSC code not found in database
-• Temporary service outage
-• Invalid IFSC code
+*IFSC Code:* `{ifsc_code}`
+*Error Type:* System Failure
 
-{Style.WARNING} Please try again with a different IFSC code.
+{Style.WARNING} *Please try:*
+• Checking the IFSC code format
+• Using a different IFSC code
+• Trying again in a few minutes
+
+*Valid IFSC Examples:*
+• `SBIN0003010` - State Bank of India
+• `HDFC0000001` - HDFC Bank
+• `ICIC0000001` - ICICI Bank
         """
         
         keyboard = [
@@ -1510,7 +1590,7 @@ Send a vehicle registration like:
 *For IFSC Lookup:*
 Send an IFSC code like:
 • `SBIN0003010`
-• `HDFC0001234`
+• `HDFC0000001`
 
 Or use the buttons below to choose your search type.
     """
