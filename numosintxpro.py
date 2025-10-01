@@ -1254,7 +1254,7 @@ Unable to retrieve information for `{vehicle_number}`.
     context.user_data['expecting_vehicle'] = False
 
 # ============================
-# IFSC CODE FUNCTIONALITY - FIXED VERSION
+# IFSC CODE FUNCTIONALITY - COMPLETELY REWRITTEN
 # ============================
 
 def clean_ifsc_code(ifsc_code: str) -> str:
@@ -1265,39 +1265,78 @@ def clean_ifsc_code(ifsc_code: str) -> str:
     return cleaned
 
 def get_ifsc_info(ifsc_code):
-    """Fetch IFSC code information from API with proper error handling"""
+    """Fetch IFSC code information from API with COMPLETE error handling"""
     try:
-        logger.info(f"Calling IFSC API: {IFSC_API_URL}{ifsc_code}")
-        response = requests.get(f"{IFSC_API_URL}{ifsc_code}", timeout=15)
+        logger.info(f"🔍 Fetching IFSC info for: {ifsc_code}")
+        logger.info(f"🌐 API URL: {IFSC_API_URL}{ifsc_code}")
+        
+        # Make request with proper headers and timeout
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+        }
+        
+        response = requests.get(
+            f"{IFSC_API_URL}{ifsc_code}", 
+            headers=headers,
+            timeout=20,
+            verify=True  # Enable SSL verification
+        )
+        
+        logger.info(f"📡 Response Status: {response.status_code}")
+        logger.info(f"📄 Response Headers: {dict(response.headers)}")
         
         # Check if response is successful
         if response.status_code == 200:
+            logger.info("✅ Got 200 response")
+            
+            # Try to parse JSON
             try:
                 data = response.json()
-                # Check if the response contains valid data (not empty or error)
+                logger.info(f"📊 Parsed JSON data: {data}")
+                
+                # Check if we have valid bank data
                 if data and isinstance(data, dict):
-                    # Check if we have at least basic bank information
                     if data.get('BANK') or data.get('BRANCH'):
+                        logger.info("✅ Valid bank data found")
                         return {"success": True, "data": data}
                     else:
+                        logger.warning("❌ No BANK or BRANCH in response")
                         return {"success": False, "error": "IFSC code exists but contains incomplete data"}
                 else:
+                    logger.warning("❌ Invalid response format")
                     return {"success": False, "error": "Invalid response format from API"}
-            except json.JSONDecodeError:
-                return {"success": False, "error": "Invalid JSON response from API"}
+                    
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ JSON decode error: {e}")
+                logger.error(f"📄 Response text: {response.text[:500]}")
+                return {"success": False, "error": f"Invalid JSON response: {str(e)}"}
+                
         elif response.status_code == 404:
+            logger.warning("❌ IFSC code not found (404)")
             return {"success": False, "error": "IFSC code not found in database"}
+            
         else:
+            logger.error(f"❌ HTTP Error: {response.status_code}")
+            logger.error(f"📄 Response text: {response.text[:500]}")
             return {"success": False, "error": f"API returned HTTP {response.status_code}"}
             
     except requests.exceptions.Timeout:
+        logger.error("⏰ Request timeout")
         return {"success": False, "error": "Request timeout - API took too long to respond"}
+        
     except requests.exceptions.ConnectionError:
+        logger.error("🔌 Connection error")
         return {"success": False, "error": "Connection error - Unable to reach IFSC API"}
+        
     except requests.exceptions.RequestException as e:
+        logger.error(f"🌐 Request exception: {e}")
         return {"success": False, "error": f"Network error: {str(e)}"}
+        
     except Exception as e:
-        logger.error(f"Unexpected error in IFSC lookup: {e}")
+        logger.error(f"💥 Unexpected error in IFSC lookup: {e}")
+        logger.exception("Full traceback:")
         return {"success": False, "error": f"Unexpected error: {str(e)}"}
 
 def format_ifsc_results(ifsc_code, data):
@@ -1305,32 +1344,41 @@ def format_ifsc_results(ifsc_code, data):
     
     if not data.get('success', False):
         error_msg = data.get('error', 'Unknown error occurred')
+        logger.error(f"❌ IFSC lookup failed: {error_msg}")
+        
         return f"""
 {Style.ERROR} *IFSC LOOKUP FAILED*
 
 {Style.IFSC} *IFSC Code:* `{ifsc_code}`
 {Style.ERROR} *Error:* {error_msg}
 
-{Style.WARNING} *Possible Solutions:*
-• Verify the IFSC code is correct
-• Try a different IFSC code
+{Style.WARNING} *Troubleshooting Steps:*
+• Verify the IFSC code spelling
 • Check your internet connection
 • Try again in a few minutes
+• Contact support if issue persists
 
-*Valid IFSC Examples:*
+*Working IFSC Examples:*
 • `SBIN0003010` - State Bank of India
 • `HDFC0000001` - HDFC Bank
 • `ICIC0000001` - ICICI Bank
         """
     
     bank_data = data['data']
+    logger.info(f"✅ Formatting successful IFSC data for: {ifsc_code}")
     
     # Format boolean values for services
     def format_bool(value):
         return '✅ Yes' if value else '❌ No'
     
+    # Format empty values
+    def format_value(value):
+        if value is None or value == '':
+            return 'Not Available'
+        return value
+    
     result_text = f"""
-{Style.BANK} *BANK IFSC DETAILS REPORT*
+{Style.BANK} *BANK IFSC DETAILS REPORT* {Style.BANK}
 
 {Style.IFSC} *IFSC Code:* `{ifsc_code}`
 {Style.CALENDAR} *Report Time:* {time.strftime('%Y-%m-%d %H:%M:%S')}
@@ -1338,36 +1386,37 @@ def format_ifsc_results(ifsc_code, data):
 ────────────────────
 
 {Style.BANK} *BANK INFORMATION*
-{Style.BANK} *Bank Name:* `{bank_data.get('BANK', 'N/A')}`
-{Style.ID_CARD} *Bank Code:* `{bank_data.get('BANKCODE', 'N/A')}`
+{Style.BANK} *Bank Name:* `{format_value(bank_data.get('BANK'))}`
+{Style.ID_CARD} *Bank Code:* `{format_value(bank_data.get('BANKCODE'))}`
 
 {Style.BRANCH} *BRANCH DETAILS*
-{Style.BRANCH} *Branch Name:* `{bank_data.get('BRANCH', 'N/A')}`
-{Style.MICR} *MICR Code:* `{bank_data.get('MICR', 'N/A')}`
-{Style.CONTACT} *Contact:* `{bank_data.get('CONTACT', 'Not Available')}`
+{Style.BRANCH} *Branch Name:* `{format_value(bank_data.get('BRANCH'))}`
+{Style.MICR} *MICR Code:* `{format_value(bank_data.get('MICR'))}`
+{Style.CONTACT} *Contact:* `{format_value(bank_data.get('CONTACT'))}`
 
 {Style.LOCATION} *LOCATION INFORMATION*
-{Style.LOCATION} *Address:* `{bank_data.get('ADDRESS', 'N/A')}`
-{Style.DISTRICT} *District:* `{bank_data.get('DISTRICT', 'N/A')}`
-{Style.CITY} *City:* `{bank_data.get('CITY', 'N/A')}`
-{Style.STATE} *State:* `{bank_data.get('STATE', 'N/A')}`
-{Style.CENTRE} *Centre:* `{bank_data.get('CENTRE', 'N/A')}`
+{Style.LOCATION} *Address:* `{format_value(bank_data.get('ADDRESS'))}`
+{Style.DISTRICT} *District:* `{format_value(bank_data.get('DISTRICT'))}`
+{Style.CITY} *City:* `{format_value(bank_data.get('CITY'))}`
+{Style.STATE} *State:* `{format_value(bank_data.get('STATE'))}`
+{Style.CENTRE} *Centre:* `{format_value(bank_data.get('CENTRE'))}`
 
 {Style.NETWORK} *BANKING SERVICES*
 {Style.UPI} *UPI:* {format_bool(bank_data.get('UPI', False))}
 {Style.RTGS} *RTGS:* {format_bool(bank_data.get('RTGS', False))}
 {Style.NEFT} *NEFT:* {format_bool(bank_data.get('NEFT', False))}
 {Style.IMPS} *IMPS:* {format_bool(bank_data.get('IMPS', False))}
-{Style.SWIFT} *SWIFT:* `{bank_data.get('SWIFT', 'Not Available')}`
+{Style.SWIFT} *SWIFT:* `{format_value(bank_data.get('SWIFT'))}`
 
 {Style.SHIELD} *Data Source:* Razorpay IFSC API
 {Style.INFO} *Note:* Information provided by official banking sources
     """
     
+    logger.info("✅ IFSC result formatted successfully")
     return result_text
 
 async def handle_ifsc_search(update: Update, context: CallbackContext, ifsc_input: str = None) -> None:
-    """Handle IFSC code input from user with enhanced error handling"""
+    """Handle IFSC code input from user with COMPLETE error handling"""
     
     if ifsc_input is None:
         if update.message:
@@ -1377,6 +1426,7 @@ async def handle_ifsc_search(update: Update, context: CallbackContext, ifsc_inpu
     
     # Clean the IFSC code
     ifsc_code = clean_ifsc_code(ifsc_input)
+    logger.info(f"🔍 Starting IFSC search for: {ifsc_code}")
     
     # Enhanced validation - IFSC should be 11 characters alphanumeric
     if len(ifsc_code) != 11:
@@ -1452,20 +1502,27 @@ First 4 characters must be letters (bank code).
     
     # Send processing message
     loading_message_id = await show_loading(chat_id, context, "ifsc")
+    logger.info(f"⏳ Loading message sent: {loading_message_id}")
     
     try:
         # Get IFSC information with enhanced error handling
-        logger.info(f"Fetching info for IFSC: {ifsc_code}")
+        logger.info(f"🌐 Calling IFSC API for: {ifsc_code}")
         result = get_ifsc_info(ifsc_code)
+        logger.info(f"📊 API result: {result.get('success', False)}")
         
         # Format and send results
         result_text = format_ifsc_results(ifsc_code, result)
+        logger.info("✅ Result formatted successfully")
         
         # Delete processing message
-        await context.bot.delete_message(
-            chat_id=chat_id,
-            message_id=loading_message_id
-        )
+        try:
+            await context.bot.delete_message(
+                chat_id=chat_id,
+                message_id=loading_message_id
+            )
+            logger.info("🗑️ Loading message deleted")
+        except Exception as e:
+            logger.warning(f"⚠️ Could not delete loading message: {e}")
         
         # Create keyboard for navigation
         keyboard = [
@@ -1477,6 +1534,7 @@ First 4 characters must be letters (bank code).
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         # Send result
+        logger.info("📤 Sending IFSC result to user")
         if update.message:
             await update.message.reply_text(
                 result_text,
@@ -1490,26 +1548,32 @@ First 4 characters must be letters (bank code).
                 parse_mode=ParseMode.MARKDOWN
             )
         
-        logger.info(f"Successfully processed IFSC request: {ifsc_code}")
+        logger.info(f"✅ Successfully completed IFSC request for: {ifsc_code}")
         
     except Exception as e:
-        logger.error(f"Unexpected error processing IFSC {ifsc_code}: {str(e)}")
+        logger.error(f"💥 CRITICAL ERROR in handle_ifsc_search: {e}")
+        logger.exception("Full traceback:")
         
         # Update processing message with comprehensive error
         error_text = f"""
-{Style.ERROR} *System Error*
+{Style.ERROR} *Critical System Error*
 
-An unexpected error occurred while processing your IFSC code.
+A critical error occurred while processing your IFSC code.
 
 *IFSC Code:* `{ifsc_code}`
-*Error Type:* System Failure
+*Error Type:* {type(e).__name__}
 
-{Style.WARNING} *Please try:*
-• Checking the IFSC code format
-• Using a different IFSC code
-• Trying again in a few minutes
+{Style.WARNING} *Technical Details:*
+• Error: {str(e)}
+• Time: {time.strftime('%Y-%m-%d %H:%M:%S')}
 
-*Valid IFSC Examples:*
+*Please try:*
+1. Checking the IFSC code format
+2. Using a different IFSC code  
+3. Trying again in a few minutes
+4. Contacting support if issue persists
+
+*Working IFSC Examples:*
 • `SBIN0003010` - State Bank of India
 • `HDFC0000001` - HDFC Bank
 • `ICIC0000001` - ICICI Bank
@@ -1521,16 +1585,39 @@ An unexpected error occurred while processing your IFSC code.
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        await context.bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=loading_message_id,
-            text=error_text,
-            parse_mode=ParseMode.MARKDOWN,
-            reply_markup=reply_markup
-        )
+        try:
+            await context.bot.edit_message_text(
+                chat_id=chat_id,
+                message_id=loading_message_id,
+                text=error_text,
+                parse_mode=ParseMode.MARKDOWN,
+                reply_markup=reply_markup
+            )
+            logger.info("✅ Error message sent to user")
+        except Exception as edit_error:
+            logger.error(f"❌ Failed to edit error message: {edit_error}")
+            # Try to send as new message
+            try:
+                if update.message:
+                    await update.message.reply_text(
+                        error_text,
+                        reply_markup=reply_markup,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                else:
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=error_text,
+                        reply_markup=reply_markup,
+                        parse_mode=ParseMode.MARKDOWN
+                    )
+                logger.info("✅ Error message sent as new message")
+            except Exception as send_error:
+                logger.error(f"💥 COMPLETE FAILURE: {send_error}")
     
     # Clear the expecting state
     context.user_data['expecting_ifsc'] = False
+    logger.info("🧹 IFSC search session cleared")
 
 # ============================
 # MAIN MESSAGE HANDLER
