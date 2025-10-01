@@ -13,6 +13,7 @@ BOT_TOKEN = "8116705267:AAHVoyKFuX2Jrt0jHrP4nyIeq-YKvbSjCQs"
 PHONE_API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
 VEHICLE_API1_URL = "https://revangevichelinfo.vercel.app/api/rc?number="
 VEHICLE_API2_URL = "https://caller.hackershub.shop/info.php?type=address&registration="
+IFSC_API_URL = "https://ifsc.razorpay.com/"
 
 # Keep Alive Server Configuration
 KEEP_ALIVE_PORT = 8080
@@ -72,6 +73,20 @@ class Style:
     COMMERCIAL = "💼"
     INSURANCE = "🏥"
     
+    # Bank/IFSC specific
+    BANK = "🏦"
+    IFSC = "💳"
+    BRANCH = "🏢"
+    MICR = "🖨️"
+    SWIFT = "🌐"
+    UPI = "📱"
+    RTGS = "💸"
+    NEFT = "💰"
+    IMPS = "⚡"
+    CONTACT = "📞"
+    DISTRICT = "🗺️"
+    CENTRE = "🏛️"
+    
     # Navigation
     BACK = "↩️"
     NEXT = "➡️"
@@ -119,7 +134,7 @@ def home():
             }}
             .feature-grid {{
                 display: grid;
-                grid-template-columns: 1fr 1fr;
+                grid-template-columns: 1fr 1fr 1fr;
                 gap: 15px;
                 margin: 20px 0;
             }}
@@ -153,6 +168,10 @@ def home():
                     <div class="feature-item">
                         <h4>🚗 Vehicle Intelligence</h4>
                         <p>Detailed vehicle information</p>
+                    </div>
+                    <div class="feature-item">
+                        <h4>🏦 Bank IFSC Lookup</h4>
+                        <p>Bank branch details by IFSC</p>
                     </div>
                 </div>
             </div>
@@ -195,7 +214,7 @@ async def start(update: Update, context: CallbackContext) -> None:
 {Style.SEARCH} *Advanced Intelligence Platform*
 {Style.SHIELD} *Secure • Fast • Professional*
 
-✨ *Dual Intelligence Features:*
+✨ *Triple Intelligence Features:*
 
 {Style.PHONE} *Phone Intelligence:*
 • Complete number analysis
@@ -209,14 +228,22 @@ async def start(update: Update, context: CallbackContext) -> None:
 • Technical Specifications
 • Insurance & Tax Details
 
+{Style.BANK} *Bank IFSC Lookup:*
+• Bank branch details
+• Service availability
+• Contact information
+• Location mapping
+
 📋 *Quick Start:*
 Choose your search type below or simply send:
 • *10-digit mobile number* for phone analysis
 • *Vehicle registration* for vehicle info
+• *IFSC code* for bank details
 
 *Examples:*
 Phone: `7044165702`, `+917044165702`
 Vehicle: `UP32AB1234`, `DL1CAB1234`
+IFSC: `SBIN0003010`, `HDFC0001234`
 
 {Style.WARNING} *Legal Notice:* Use responsibly in compliance with applicable laws.
     """
@@ -224,6 +251,7 @@ Vehicle: `UP32AB1234`, `DL1CAB1234`
     keyboard = [
         [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search"),
          InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
+        [InlineKeyboardButton(f"{Style.BANK} IFSC Search", callback_data="ifsc_search")],
         [InlineKeyboardButton(f"{Style.HELP} Get Help", callback_data="help")],
         [InlineKeyboardButton(f"{Style.SEARCH} Quick Examples", callback_data="quick_examples")]
     ]
@@ -259,9 +287,15 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 2. Enter registration number
 3. Get instant results
 
+{Style.BANK} *IFSC Lookup:*
+1. Click IFSC Search button
+2. Enter IFSC code
+3. Get bank branch details
+
 {Style.NETWORK} *Supported Formats:*
 • *Phone:* 10-digit numbers, International format, With country code
 • *Vehicle:* UP32AB1234, DL1CAB1234, HR26DK7890
+• *IFSC:* SBIN0003010, HDFC0001234, ICIC0000001
 
 {Style.SHIELD} *Security Features:*
 • Encrypted communication
@@ -281,6 +315,7 @@ Use the buttons below to start a search!
     keyboard = [
         [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search"),
          InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
+        [InlineKeyboardButton(f"{Style.BANK} IFSC Search", callback_data="ifsc_search")],
         [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -304,6 +339,8 @@ async def show_loading(chat_id, context: CallbackContext, search_type="request")
         loading_text = f"{Style.LOADING} *Processing phone number...*"
     elif search_type == "vehicle":
         loading_text = f"{Style.LOADING} *Searching vehicle database...*"
+    elif search_type == "ifsc":
+        loading_text = f"{Style.LOADING} *Fetching bank details...*"
     else:
         loading_text = f"{Style.LOADING} *Processing your request...*"
     
@@ -330,6 +367,8 @@ async def button_handler(update: Update, context: CallbackContext) -> None:
         await phone_search_handler(update, context)
     elif query.data == "vehicle_search":
         await vehicle_search_handler(update, context)
+    elif query.data == "ifsc_search":
+        await ifsc_search_handler(update, context)
     elif query.data == "new_search":
         await query.edit_message_text(f"{Style.SEARCH} *Choose search type or send input directly...*", parse_mode=ParseMode.MARKDOWN)
     elif query.data.startswith("page_"):
@@ -338,7 +377,7 @@ async def button_handler(update: Update, context: CallbackContext) -> None:
         await retry_handler(update, context)
 
 async def show_quick_examples(update: Update, context: CallbackContext) -> None:
-    """Show quick examples for both services."""
+    """Show quick examples for all services."""
     examples_text = f"""
 {Style.SEARCH} *QUICK EXAMPLES*
 
@@ -353,12 +392,19 @@ async def show_quick_examples(update: Update, context: CallbackContext) -> None:
 • `HR26DK7890` - Haryana
 • `KA01AB1234` - Karnataka
 
+{Style.BANK} *IFSC Code Examples:*
+• `SBIN0003010` - State Bank of India
+• `HDFC0001234` - HDFC Bank
+• `ICIC0000001` - ICICI Bank
+• `PNB0012000` - Punjab National Bank
+
 {Style.INFO} Simply send any of these formats to get started, or use the search buttons below.
     """
     
     keyboard = [
         [InlineKeyboardButton(f"{Style.PHONE} Try Phone Example", callback_data="try_phone_example"),
          InlineKeyboardButton(f"{Style.CAR} Try Vehicle Example", callback_data="try_vehicle_example")],
+        [InlineKeyboardButton(f"{Style.BANK} Try IFSC Example", callback_data="try_ifsc_example")],
         [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -390,6 +436,7 @@ Please enter the mobile number:
     )
     context.user_data['expecting_phone'] = True
     context.user_data['expecting_vehicle'] = False
+    context.user_data['expecting_ifsc'] = False
 
 async def vehicle_search_handler(update: Update, context: CallbackContext) -> None:
     """Handle vehicle search button."""
@@ -412,6 +459,30 @@ Please enter the vehicle registration number:
     )
     context.user_data['expecting_vehicle'] = True
     context.user_data['expecting_phone'] = False
+    context.user_data['expecting_ifsc'] = False
+
+async def ifsc_search_handler(update: Update, context: CallbackContext) -> None:
+    """Handle IFSC search button."""
+    search_text = f"""
+{Style.BANK} *IFSC CODE SEARCH*
+
+Please enter the IFSC code:
+
+*Examples:*
+• `SBIN0003010` - State Bank of India
+• `HDFC0001234` - HDFC Bank
+• `ICIC0000001` - ICICI Bank
+
+ℹ️ IFSC code is 11 characters (4 letters + 7 digits/letters)
+    """
+    
+    await update.callback_query.edit_message_text(
+        search_text,
+        parse_mode=ParseMode.MARKDOWN
+    )
+    context.user_data['expecting_ifsc'] = True
+    context.user_data['expecting_phone'] = False
+    context.user_data['expecting_vehicle'] = False
 
 async def try_phone_example(update: Update, context: CallbackContext) -> None:
     """Try phone number example."""
@@ -420,6 +491,10 @@ async def try_phone_example(update: Update, context: CallbackContext) -> None:
 async def try_vehicle_example(update: Update, context: CallbackContext) -> None:
     """Try vehicle number example."""
     await handle_vehicle_search(update, context, "UP32AB1234")
+
+async def try_ifsc_example(update: Update, context: CallbackContext) -> None:
+    """Try IFSC code example."""
+    await handle_ifsc_search(update, context, "SBIN0003010")
 
 # ============================
 # PHONE NUMBER FUNCTIONALITY
@@ -619,9 +694,12 @@ async def send_error_message(update: Update, context: CallbackContext, error_tex
     if search_type == "phone":
         retry_button = InlineKeyboardButton(f"{Style.PHONE} Retry Search", callback_data=f"retry_phone_{number}")
         search_button = InlineKeyboardButton(f"{Style.PHONE} New Phone Search", callback_data="phone_search")
-    else:
+    elif search_type == "vehicle":
         retry_button = InlineKeyboardButton(f"{Style.CAR} Retry Search", callback_data=f"retry_vehicle_{number}")
         search_button = InlineKeyboardButton(f"{Style.CAR} New Vehicle Search", callback_data="vehicle_search")
+    else:  # ifsc
+        retry_button = InlineKeyboardButton(f"{Style.BANK} Retry Search", callback_data=f"retry_ifsc_{number}")
+        search_button = InlineKeyboardButton(f"{Style.BANK} New IFSC Search", callback_data="ifsc_search")
     
     keyboard = [
         [retry_button],
@@ -814,6 +892,7 @@ async def send_record_page(update: Update, context: CallbackContext, records: li
     action_buttons = [
         InlineKeyboardButton(f"{Style.PHONE} New Phone Search", callback_data="phone_search"),
         InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search"),
+        InlineKeyboardButton(f"{Style.BANK} IFSC Search", callback_data="ifsc_search"),
         InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")
     ]
     keyboard.append(action_buttons)
@@ -854,6 +933,9 @@ async def retry_handler(update: Update, context: CallbackContext) -> None:
     elif data.startswith('retry_vehicle_'):
         number = data.replace('retry_vehicle_', '')
         await handle_vehicle_search(update, context, number)
+    elif data.startswith('retry_ifsc_'):
+        number = data.replace('retry_ifsc_', '')
+        await handle_ifsc_search(update, context, number)
 
 # ============================
 # VEHICLE FUNCTIONALITY
@@ -1067,6 +1149,7 @@ Please enter a valid registration number (minimum 5 characters).
         keyboard = [
             [InlineKeyboardButton(f"{Style.CAR} New Vehicle Search", callback_data="vehicle_search")],
             [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search")],
+            [InlineKeyboardButton(f"{Style.BANK} IFSC Search", callback_data="ifsc_search")],
             [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1171,6 +1254,205 @@ Unable to retrieve information for `{vehicle_number}`.
     context.user_data['expecting_vehicle'] = False
 
 # ============================
+# IFSC CODE FUNCTIONALITY
+# ============================
+
+def clean_ifsc_code(ifsc_code: str) -> str:
+    """Clean and validate IFSC code."""
+    cleaned = ifsc_code.upper().strip()
+    # Remove spaces and special characters, keep alphanumeric
+    cleaned = ''.join(c for c in cleaned if c.isalnum())
+    return cleaned
+
+def get_ifsc_info(ifsc_code):
+    """Fetch IFSC code information from API"""
+    try:
+        logger.info(f"Calling IFSC API: {IFSC_API_URL}{ifsc_code}")
+        response = requests.get(f"{IFSC_API_URL}{ifsc_code}", timeout=15)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"error": f"API HTTP {response.status_code}"}
+    except Exception as e:
+        return {"error": f"API Error: {str(e)}"}
+
+def format_ifsc_results(ifsc_code, data):
+    """Format the IFSC information results"""
+    
+    if 'error' in data:
+        return f"""
+{Style.ERROR} *IFSC LOOKUP FAILED*
+
+*IFSC Code:* `{ifsc_code}`
+*Error:* {data['error']}
+
+{Style.WARNING} Please check the IFSC code and try again.
+        """
+    
+    result_text = f"""
+{Style.BANK} *BANK IFSC DETAILS REPORT*
+
+{Style.IFSC} *IFSC Code:* `{ifsc_code}`
+{Style.CALENDAR} *Report Time:* {time.strftime('%Y-%m-%d %H:%M:%S')}
+
+────────────────────
+
+{Style.BANK} *BANK INFORMATION*
+{Style.BANK} *Bank Name:* {data.get('BANK', 'N/A')}
+{Style.ID_CARD} *Bank Code:* {data.get('BANKCODE', 'N/A')}
+
+{Style.BRANCH} *BRANCH DETAILS*
+{Style.BRANCH} *Branch Name:* {data.get('BRANCH', 'N/A')}
+{Style.MICR} *MICR Code:* {data.get('MICR', 'N/A')}
+{Style.CONTACT} *Contact:* {data.get('CONTACT', 'N/A') if data.get('CONTACT') else 'Not Available'}
+
+{Style.LOCATION} *LOCATION INFORMATION*
+{Style.LOCATION} *Address:* {data.get('ADDRESS', 'N/A')}
+{Style.DISTRICT} *District:* {data.get('DISTRICT', 'N/A')}
+{Style.CITY} *City:* {data.get('CITY', 'N/A')}
+{Style.STATE} *State:* {data.get('STATE', 'N/A')}
+{Style.CENTRE} *Centre:* {data.get('CENTRE', 'N/A')}
+
+{Style.NETWORK} *BANKING SERVICES*
+{Style.UPI} *UPI:* {'✅ Available' if data.get('UPI') else '❌ Not Available'}
+{Style.RTGS} *RTGS:* {'✅ Available' if data.get('RTGS') else '❌ Not Available'}
+{Style.NEFT} *NEFT:* {'✅ Available' if data.get('NEFT') else '❌ Not Available'}
+{Style.IMPS} *IMPS:* {'✅ Available' if data.get('IMPS') else '❌ Not Available'}
+{Style.SWIFT} *SWIFT:* {data.get('SWIFT', 'N/A') if data.get('SWIFT') else 'Not Available'}
+
+{Style.SHIELD} *Data Source:* Razorpay IFSC API
+{Style.INFO} *Note:* Some information may not be available for all banks
+    """
+    
+    return result_text
+
+async def handle_ifsc_search(update: Update, context: CallbackContext, ifsc_input: str = None) -> None:
+    """Handle IFSC code input from user"""
+    
+    if ifsc_input is None:
+        if update.message:
+            ifsc_input = update.message.text
+        else:
+            return
+    
+    # Clean the IFSC code
+    ifsc_code = clean_ifsc_code(ifsc_input)
+    
+    # Basic validation - IFSC should be 11 characters alphanumeric
+    if len(ifsc_code) != 11 or not ifsc_code[:4].isalpha() or not ifsc_code[4:].isalnum():
+        error_text = f"""
+{Style.ERROR} *Invalid IFSC Code!*
+
+Please enter a valid 11-character IFSC code.
+
+*Format:* 4 letters + 7 digits/letters
+*Examples:*
+• `SBIN0003010` - State Bank of India
+• `HDFC0001234` - HDFC Bank
+• `ICIC0000001` - ICICI Bank
+
+{Style.WARNING} IFSC code must follow the standard format.
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.BANK} Try Again", callback_data="ifsc_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        if update.message:
+            await update.message.reply_text(
+                error_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.callback_query.edit_message_text(
+                error_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        return
+    
+    chat_id = update.effective_chat.id
+    
+    # Send processing message
+    loading_message_id = await show_loading(chat_id, context, "ifsc")
+    
+    try:
+        # Get IFSC information
+        logger.info(f"Fetching info for IFSC: {ifsc_code}")
+        results = get_ifsc_info(ifsc_code)
+        
+        # Format and send results
+        result_text = format_ifsc_results(ifsc_code, results)
+        
+        # Delete processing message
+        await context.bot.delete_message(
+            chat_id=chat_id,
+            message_id=loading_message_id
+        )
+        
+        # Create keyboard for navigation
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.BANK} New IFSC Search", callback_data="ifsc_search")],
+            [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search")],
+            [InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        # Send result
+        if update.message:
+            await update.message.reply_text(
+                result_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        else:
+            await update.callback_query.edit_message_text(
+                result_text,
+                reply_markup=reply_markup,
+                parse_mode=ParseMode.MARKDOWN
+            )
+        
+        logger.info(f"Successfully sent results for IFSC: {ifsc_code}")
+        
+    except Exception as e:
+        logger.error(f"Error processing IFSC {ifsc_code}: {str(e)}")
+        
+        # Update processing message with error
+        error_text = f"""
+{Style.ERROR} *IFSC Search Failed*
+
+Unable to retrieve information for `{ifsc_code}`.
+
+*Possible reasons:*
+• IFSC code not found in database
+• Temporary service outage
+• Invalid IFSC code
+
+{Style.WARNING} Please try again with a different IFSC code.
+        """
+        
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.BANK} Try Again", callback_data="ifsc_search")],
+            [InlineKeyboardButton(f"{Style.HOME} Main Menu", callback_data="main_menu")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await context.bot.edit_message_text(
+            chat_id=chat_id,
+            message_id=loading_message_id,
+            text=error_text,
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=reply_markup
+        )
+    
+    # Clear the expecting state
+    context.user_data['expecting_ifsc'] = False
+
+# ============================
 # MAIN MESSAGE HANDLER
 # ============================
 
@@ -1185,10 +1467,14 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     elif context.user_data.get('expecting_vehicle', False):
         await handle_vehicle_search(update, context)
         return
+    elif context.user_data.get('expecting_ifsc', False):
+        await handle_ifsc_search(update, context)
+        return
     
     # Auto-detect input type
     cleaned_phone = clean_phone_number(text)
     cleaned_vehicle = clean_vehicle_number(text)
+    cleaned_ifsc = clean_ifsc_code(text)
     
     # Check if it's a phone number (10 digits after cleaning)
     if len(cleaned_phone) == 10:
@@ -1200,11 +1486,16 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         await handle_vehicle_search(update, context)
         return
     
+    # Check if it's an IFSC code (11 characters, first 4 are letters)
+    if len(cleaned_ifsc) == 11 and cleaned_ifsc[:4].isalpha() and cleaned_ifsc[4:].isalnum():
+        await handle_ifsc_search(update, context)
+        return
+    
     # If we can't determine, show help
     help_text = f"""
 {Style.INFO} *OSINT Pro Master Bot*
 
-I can help you with both phone and vehicle intelligence.
+I can help you with phone, vehicle, and bank intelligence.
 
 *For Phone Analysis:*
 Send a 10-digit mobile number like:
@@ -1216,12 +1507,18 @@ Send a vehicle registration like:
 • `UP32AB1234`
 • `DL1CAB1234`
 
+*For IFSC Lookup:*
+Send an IFSC code like:
+• `SBIN0003010`
+• `HDFC0001234`
+
 Or use the buttons below to choose your search type.
     """
     
     keyboard = [
         [InlineKeyboardButton(f"{Style.PHONE} Phone Search", callback_data="phone_search"),
          InlineKeyboardButton(f"{Style.CAR} Vehicle Search", callback_data="vehicle_search")],
+        [InlineKeyboardButton(f"{Style.BANK} IFSC Search", callback_data="ifsc_search")],
         [InlineKeyboardButton(f"{Style.HELP} Help", callback_data="help")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -1248,9 +1545,10 @@ def main() -> None:
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Callback query handlers
-    application.add_handler(CallbackQueryHandler(button_handler, pattern="^(help|main_menu|quick_examples|phone_search|vehicle_search|new_search)$"))
+    application.add_handler(CallbackQueryHandler(button_handler, pattern="^(help|main_menu|quick_examples|phone_search|vehicle_search|ifsc_search|new_search)$"))
     application.add_handler(CallbackQueryHandler(try_phone_example, pattern="^try_phone_example$"))
     application.add_handler(CallbackQueryHandler(try_vehicle_example, pattern="^try_vehicle_example$"))
+    application.add_handler(CallbackQueryHandler(try_ifsc_example, pattern="^try_ifsc_example$"))
     application.add_handler(CallbackQueryHandler(retry_handler, pattern="^retry_"))
     application.add_handler(CallbackQueryHandler(handle_pagination, pattern="^page_"))
     
@@ -1261,6 +1559,7 @@ def main() -> None:
     print(f"{Style.ROCKET} Telegram Bot: @osint_pro_number_bot")
     print(f"{Style.PHONE} Phone Intelligence: ACTIVE")
     print(f"{Style.CAR} Vehicle Intelligence: ACTIVE")
+    print(f"{Style.BANK} IFSC Lookup: ACTIVE")
     print(f"{Style.SHIELD} Status: ONLINE & MONITORING")
     print("=" * 50)
     print("Press Ctrl+C to stop all services")
