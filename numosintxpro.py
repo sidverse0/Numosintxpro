@@ -53,6 +53,8 @@ class Style:
     INFO = "ℹ️"
     RELOAD = "🔄"
     ID_CARD = "🆔"
+    CITY = "🏙️"
+    STATE = "🗺️"
     
     # Phone specific
     PHONE = "📱"
@@ -1019,7 +1021,7 @@ def format_vehicle_results(vehicle_number, results):
             (f"💰 Financier Name", data.get('financier_name')),
             (f"{Style.BUILDING} RTO", data.get('rto')),
             (f"{Style.LOCATION} Address", data.get('address')),
-            (f"🏙️ City", data.get('city')),
+            (f"{Style.CITY} City", data.get('city')),
             (f"{Style.PHONE_V} Phone", data.get('phone'))
         ]
         
@@ -1254,7 +1256,7 @@ Unable to retrieve information for `{vehicle_number}`.
     context.user_data['expecting_vehicle'] = False
 
 # ============================
-# IFSC CODE FUNCTIONALITY - COMPLETELY REWRITTEN
+# IFSC CODE FUNCTIONALITY - COMPLETELY FIXED
 # ============================
 
 def clean_ifsc_code(ifsc_code: str) -> str:
@@ -1285,7 +1287,6 @@ def get_ifsc_info(ifsc_code):
         )
         
         logger.info(f"📡 Response Status: {response.status_code}")
-        logger.info(f"📄 Response Headers: {dict(response.headers)}")
         
         # Check if response is successful
         if response.status_code == 200:
@@ -1294,7 +1295,7 @@ def get_ifsc_info(ifsc_code):
             # Try to parse JSON
             try:
                 data = response.json()
-                logger.info(f"📊 Parsed JSON data: {data}")
+                logger.info(f"📊 Parsed JSON data successfully")
                 
                 # Check if we have valid bank data
                 if data and isinstance(data, dict):
@@ -1319,7 +1320,6 @@ def get_ifsc_info(ifsc_code):
             
         else:
             logger.error(f"❌ HTTP Error: {response.status_code}")
-            logger.error(f"📄 Response text: {response.text[:500]}")
             return {"success": False, "error": f"API returned HTTP {response.status_code}"}
             
     except requests.exceptions.Timeout:
@@ -1336,7 +1336,6 @@ def get_ifsc_info(ifsc_code):
         
     except Exception as e:
         logger.error(f"💥 Unexpected error in IFSC lookup: {e}")
-        logger.exception("Full traceback:")
         return {"success": False, "error": f"Unexpected error: {str(e)}"}
 
 def format_ifsc_results(ifsc_code, data):
