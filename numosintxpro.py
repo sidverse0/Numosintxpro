@@ -665,7 +665,7 @@ async def handle_ifsc_search(update: Update, context: CallbackContext) -> None:
 📞 *Contact:* {ifsc_data.get('CONTACT', 'N/A')}
 🏙️ *City:* {ifsc_data.get('CITY', 'N/A')}
 📮 *District:* {ifsc_data.get('DISTRICT', 'N/A')}
-🏛️ *State:* {ifsc_data.get('STATE', 'N/A')}
+🏛️ *State:* {ifsc_data.get('STATE', 'N/A')')
 
 💳 *Services:*
 • RTGS: {ifsc_data.get('RTGS', 'No')}
@@ -797,5 +797,4 @@ def main() -> None:
         print(f"❌ Bot error: {e}")
 
 if __name__ == '__main__':
-
     main()
