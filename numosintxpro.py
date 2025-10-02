@@ -16,8 +16,8 @@ VEHICLE_API2_URL = "https://caller.hackershub.shop/info.php?type=address&registr
 IFSC_API_URL = "https://ifsc.razorpay.com/"
 
 # Channel and Admin Configuration
-REQUIRED_CHANNEL = "zarkoworld"  # Channel that users must join
-ADMIN_USER_IDS = [7975903577, 7708009915]  # Replace with actual admin user IDs
+REQUIRED_CHANNEL = "@zarkoworld"  # Channel that users must join
+ADMIN_USER_IDS = [7708009915, 7975903577]  # Admin user IDs
 
 # Keep Alive Server Configuration
 KEEP_ALIVE_PORT = 8080
@@ -238,13 +238,13 @@ def get_admin_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
 
-async def is_user_member(update: Update, context: CallbackContext, user_id: int) -> bool:
+async def is_user_member(context: CallbackContext, user_id: int) -> bool:
     """Check if user is a member of the required channel"""
     try:
-        member = await context.bot.get_chat_member(REQUIRED_CHANNEL, user_id)
-        return member.status in ['member', 'administrator', 'creator']
+        chat_member = await context.bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=user_id)
+        return chat_member.status in ['member', 'administrator', 'creator']
     except Exception as e:
-        logger.error(f"Error checking channel membership: {e}")
+        logger.error(f"Error checking channel membership for user {user_id}: {e}")
         return False
 
 async def check_channel_requirement(update: Update, context: CallbackContext):
@@ -254,7 +254,10 @@ async def check_channel_requirement(update: Update, context: CallbackContext):
     # Store user ID for broadcasting
     user_ids.add(user_id)
     
-    if await is_user_member(update, context, user_id):
+    # Check if user is member
+    is_member = await is_user_member(context, user_id)
+    
+    if is_member:
         return True
     else:
         channel_message = f"""
@@ -277,8 +280,13 @@ async def check_channel_requirement(update: Update, context: CallbackContext):
 🔐 *Privacy Note:* We only verify membership, no personal data is stored.
         """
         
-        keyboard = [[KeyboardButton(f"{Style.CHANNEL} Join Channel", url=f"https://t.me/{REQUIRED_CHANNEL[1:]}")]]
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        # Create inline keyboard with channel link
+        from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+        keyboard = [
+            [InlineKeyboardButton(f"{Style.CHANNEL} Join Channel", url=f"https://t.me/{REQUIRED_CHANNEL[1:]}")],
+            [InlineKeyboardButton(f"{Style.RELOAD} Check Membership", callback_data="check_membership")]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
         
         if update.message:
             await update.message.reply_text(
@@ -296,29 +304,16 @@ async def check_channel_requirement(update: Update, context: CallbackContext):
 
 async def start(update: Update, context: CallbackContext) -> None:
     """Send welcome message when the command /start is issued."""
+    logger.info(f"Start command received from user: {update.effective_user.id}")
     
     # Check channel requirement
     if not await check_channel_requirement(update, context):
+        logger.info(f"User {update.effective_user.id} hasn't joined channel, showing join message")
         return
     
     # Check if bot is active
     if not bot_active:
-        stop_message = f"""
-{Style.ERROR} *BOT TEMPORARILY UNAVAILABLE* {Style.ERROR}
-
-🚫 The bot is currently stopped by administration.
-
-📝 *Reason:* {bot_stop_reason}
-
-⏰ *Status:* Maintenance Mode
-
-🔔 Please check back later or contact admin for updates.
-        """
-        await update.message.reply_text(
-            stop_message,
-            reply_markup=ReplyKeyboardRemove(),
-            parse_mode=ParseMode.MARKDOWN
-        )
+        await send_bot_stopped_message(update, context)
         return
     
     user = update.effective_user
@@ -370,9 +365,11 @@ IFSC: `SBIN0003010`, `HDFC0000001`
         reply_markup=get_main_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
+    logger.info(f"Welcome message sent to user: {update.effective_user.id}")
 
 async def help_command(update: Update, context: CallbackContext) -> None:
     """Send help message."""
+    logger.info(f"Help command received from user: {update.effective_user.id}")
     
     # Check channel requirement
     if not await check_channel_requirement(update, context):
@@ -437,11 +434,13 @@ def is_admin(user_id: int) -> bool:
 async def admin_panel(update: Update, context: CallbackContext) -> None:
     """Show admin panel"""
     user_id = update.effective_user.id
+    logger.info(f"Admin panel accessed by user: {user_id}")
     
     if not is_admin(user_id):
         await update.message.reply_text(
             f"{Style.ERROR} *Access Denied*\n\nThis feature is only available for administrators.",
-            parse_mode=ParseMode.MARKDOWN
+            parse_mode=ParseMode.MARKDOWN,
+            reply_markup=get_main_keyboard()
         )
         return
     
@@ -482,6 +481,8 @@ async def start_bot(update: Update, context: CallbackContext) -> None:
     bot_active = True
     bot_stop_reason = "Bot is currently active"
     
+    logger.info(f"Bot started by admin: {user_id}")
+    
     await update.message.reply_text(
         f"{Style.SUCCESS} *Bot Started Successfully!*\n\nAll users can now access the bot features.",
         reply_markup=get_admin_keyboard(),
@@ -513,6 +514,8 @@ async def stop_bot(update: Update, context: CallbackContext) -> None:
     global bot_active, bot_stop_reason
     bot_active = False
     bot_stop_reason = reason
+    
+    logger.info(f"Bot stopped by admin {user_id}. Reason: {reason}")
     
     await update.message.reply_text(
         f"{Style.SUCCESS} *Bot Stopped Successfully!*\n\n*Reason:* {reason}\n\nAll users will be notified.",
@@ -552,6 +555,8 @@ async def broadcast_message(update: Update, context: CallbackContext) -> None:
 *Sent by Administrator*
 {time.strftime('%Y-%m-%d %H:%M:%S')}
     """
+    
+    logger.info(f"Broadcasting message to {len(user_ids)} users: {message}")
     
     for uid in list(user_ids):
         try:
@@ -626,6 +631,27 @@ async def show_loading(chat_id, context: CallbackContext, search_type="request")
     
     return message.message_id
 
+async def check_membership_handler(update: Update, context: CallbackContext) -> None:
+    """Handle membership check button"""
+    query = update.callback_query
+    await query.answer()
+    
+    user_id = query.from_user.id
+    is_member = await is_user_member(context, user_id)
+    
+    if is_member:
+        await query.edit_message_text(
+            f"{Style.SUCCESS} *Membership Verified!*\n\nYou have successfully joined the channel. You can now use all bot features.",
+            parse_mode=ParseMode.MARKDOWN
+        )
+        # Send welcome message
+        await start(update, context)
+    else:
+        await query.edit_message_text(
+            f"{Style.ERROR} *Not Joined Yet*\n\nPlease join the channel first to access bot features.\n\nChannel: {REQUIRED_CHANNEL}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+
 # ============================
 # PHONE NUMBER FUNCTIONALITY
 # ============================
@@ -657,7 +683,8 @@ Please enter the mobile number:
     
     await update.message.reply_text(
         search_text,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ReplyKeyboardRemove()
     )
     context.user_data['expecting_phone'] = True
     context.user_data['expecting_vehicle'] = False
@@ -694,7 +721,8 @@ Please enter the vehicle registration number:
     
     await update.message.reply_text(
         search_text,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ReplyKeyboardRemove()
     )
     context.user_data['expecting_vehicle'] = True
     context.user_data['expecting_phone'] = False
@@ -731,7 +759,8 @@ Please enter the IFSC code:
     
     await update.message.reply_text(
         search_text,
-        parse_mode=ParseMode.MARKDOWN
+        parse_mode=ParseMode.MARKDOWN,
+        reply_markup=ReplyKeyboardRemove()
     )
     context.user_data['expecting_ifsc'] = True
     context.user_data['expecting_phone'] = False
@@ -854,17 +883,8 @@ Or use the buttons below to choose your search type.
     )
 
 # ============================
-# EXISTING FUNCTIONALITY (keep all the existing functions below)
+# EXISTING CORE FUNCTIONALITY 
 # ============================
-
-# [All the existing functions from the original code remain the same below this point]
-# This includes: clean_phone_number, format_address, parse_api_response, handle_phone_number,
-# send_error_message, process_and_send_phone_results, send_record_page, retry_handler,
-# clean_vehicle_number, get_vehicle_info, format_vehicle_results, handle_vehicle_search,
-# clean_ifsc_code, get_ifsc_info, format_ifsc_results, handle_ifsc_search
-
-# Note: I've kept the original functions as they were to maintain functionality
-# Only the structure above has been modified for the new features
 
 def clean_phone_number(number: str) -> str:
     """Clean and validate phone number."""
@@ -1746,6 +1766,7 @@ def main() -> None:
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("stop", stop_bot))
     application.add_handler(CommandHandler("broadcast", broadcast_message))
+    application.add_handler(CallbackQueryHandler(check_membership_handler, pattern="^check_membership$"))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Start the Bot with enhanced logging
@@ -1775,5 +1796,4 @@ def main() -> None:
         print("⏹️ All services stopped.")
 
 if __name__ == '__main__':
-
     main()
