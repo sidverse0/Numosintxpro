@@ -98,6 +98,14 @@ def get_admin_keyboard():
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
 
+def get_search_keyboard():
+    """Get search options keyboard"""
+    keyboard = [
+        [KeyboardButton(f"{Style.PHONE} Phone Search"), KeyboardButton(f"{Style.CAR} Vehicle Search")],
+        [KeyboardButton(f"{Style.BANK} IFSC Search"), KeyboardButton(f"{Style.HOME} Main Menu")]
+    ]
+    return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, persistent=True)
+
 async def is_user_member(context: CallbackContext, user_id: int) -> bool:
     """Check if user is a member of the required channel"""
     try:
@@ -138,7 +146,7 @@ async def send_channel_join_message(update: Update):
 
 {Style.WARNING} *Steps:*
 1. Click the button below to join our channel
-2. After joining, come back and send /start again
+2. After joining, click 'I've Joined' button
 3. Enjoy all bot features!
 
 🔐 *Note:* We only verify membership, no personal data stored.
@@ -181,23 +189,24 @@ async def start(update: Update, context: CallbackContext) -> None:
 
 {Style.PHONE} *Phone Intelligence*
 • Complete number analysis
-• Detailed subscriber information
+• Carrier information
+• Location details
 
 {Style.CAR} *Vehicle Intelligence*  
 • Complete RC Information
-• Technical Specifications
+• Owner details
+• Vehicle specifications
 
 {Style.BANK} *Bank IFSC Lookup*
 • Bank branch details
+• Address information
 • Service availability
 
-📋 *Quick Start:*
-Use buttons below or send directly:
-• Phone: `7044165702`
-• Vehicle: `UP32AB1234` 
-• IFSC: `SBIN0003010`
+📋 *How to Use:*
+Simply use the buttons below to select your search type!
 
-{Style.WARNING} *Legal Notice:* Use responsibly.
+{Style.WARNING} *Legal Notice:* Use responsibly for legitimate purposes only.
+Unauthorized access to information is prohibited.
     """
     
     await update.message.reply_text(
@@ -222,22 +231,27 @@ async def help_command(update: Update, context: CallbackContext) -> None:
 {Style.PHONE} *Phone Search:*
 1. Click 'Num Info' button
 2. Enter 10-digit mobile number
-3. Get detailed report
+3. Get detailed information including carrier and location
 
 {Style.CAR} *Vehicle Search:*
 1. Click 'RTO Info' button  
-2. Enter vehicle number
-3. Get complete information
+2. Enter vehicle registration number
+3. Get complete RC information and owner details
 
 {Style.BANK} *IFSC Search:*
 1. Click 'IFSC Info' button
 2. Enter IFSC code
-3. Get bank details
+3. Get bank branch details and address
 
 {Style.NETWORK} *Supported Formats:*
-• Phone: 7044165702, +917044165702
+• Phone: 7044165702, 9876543210
 • Vehicle: UP32AB1234, DL1CAB1234
 • IFSC: SBIN0003010, HDFC0000001
+
+{Style.WARNING} *Important:*
+• Use only for legitimate purposes
+• Respect privacy laws
+• Data accuracy depends on external sources
     """
     
     await update.message.reply_text(
@@ -268,11 +282,13 @@ async def admin_panel(update: Update, context: CallbackContext) -> None:
 🤖 *Bot Status:* {'🟢 ACTIVE' if bot_active else '🔴 STOPPED'}
 📝 *Reason:* {bot_stop_reason}
 👥 *Total Users:* {len(user_ids)}
+⏰ *Last Updated:* {time.strftime('%Y-%m-%d %H:%M:%S')}
 
 🛠️ *Admin Controls:*
-• Start/Stop Bot
-• Broadcast Messages
-• User Statistics
+• Start/Stop Bot operations
+• Broadcast messages to all users
+• View user statistics
+• Access all search features
     """
     
     await update.message.reply_text(
@@ -293,7 +309,7 @@ async def start_bot(update: Update, context: CallbackContext) -> None:
     bot_stop_reason = "Bot is currently active"
     
     await update.message.reply_text(
-        f"{Style.SUCCESS} *Bot Started Successfully!*",
+        f"{Style.SUCCESS} *Bot Started Successfully!*\n\nAll features are now available to users.",
         reply_markup=get_admin_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
@@ -319,7 +335,7 @@ async def stop_bot(update: Update, context: CallbackContext) -> None:
     bot_stop_reason = reason
     
     await update.message.reply_text(
-        f"{Style.SUCCESS} *Bot Stopped!*\nReason: {reason}",
+        f"{Style.SUCCESS} *Bot Stopped!*\n\nReason: {reason}\n\nUsers will be notified that the bot is temporarily unavailable.",
         reply_markup=get_admin_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
@@ -340,21 +356,28 @@ async def broadcast_message(update: Update, context: CallbackContext) -> None:
     
     message = ' '.join(context.args)
     success_count = 0
+    failed_count = 0
+    
+    processing_msg = await update.message.reply_text(
+        f"{Style.LOADING} Broadcasting to {len(user_ids)} users...",
+        parse_mode=ParseMode.MARKDOWN
+    )
     
     for uid in list(user_ids):
         try:
             await context.bot.send_message(
                 chat_id=uid,
-                text=f"📢 *Broadcast:* {message}",
+                text=f"📢 *BROADCAST MESSAGE*\n\n{message}\n\n*From:* Admin",
                 parse_mode=ParseMode.MARKDOWN
             )
             success_count += 1
+            time.sleep(0.1)  # Rate limiting
         except Exception as e:
             logger.error(f"Broadcast failed for {uid}: {e}")
+            failed_count += 1
     
-    await update.message.reply_text(
-        f"📊 Broadcast sent to {success_count} users",
-        reply_markup=get_admin_keyboard(),
+    await processing_msg.edit_text(
+        f"📊 *Broadcast Complete*\n\n✅ Success: {success_count}\n❌ Failed: {failed_count}\n📊 Total: {len(user_ids)}",
         parse_mode=ParseMode.MARKDOWN
     )
 
@@ -366,7 +389,7 @@ async def user_count(update: Update, context: CallbackContext) -> None:
         return
     
     await update.message.reply_text(
-        f"👥 *Total Users:* {len(user_ids)}",
+        f"📊 *USER STATISTICS*\n\n👥 Total Users: {len(user_ids)}\n⏰ Last Updated: {time.strftime('%Y-%m-%d %H:%M:%S')}",
         reply_markup=get_admin_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
@@ -380,7 +403,9 @@ async def send_bot_stopped_message(update: Update, context: CallbackContext):
 
 📝 *Reason:* {bot_stop_reason}
 
-🔔 Please check back later.
+🔔 Please check back later or contact admin.
+
+We apologize for the inconvenience.
     """
     await update.message.reply_text(
         stop_message,
@@ -398,13 +423,31 @@ async def check_membership_handler(update: Update, context: CallbackContext) -> 
     
     if is_member:
         await query.edit_message_text(
-            f"{Style.SUCCESS} *Verified!* You can now use the bot.",
+            f"{Style.SUCCESS} *Membership Verified!* Welcome to Zarko OSINT Bot.",
             parse_mode=ParseMode.MARKDOWN
         )
-        await start(update, context)
+        # Send welcome message with keyboard
+        user = query.from_user
+        welcome_text = f"""
+{Style.SUCCESS} *Welcome {user.first_name}!*
+
+You now have full access to all OSINT features.
+
+Use the buttons below to get started:
+• 📱 Num Info - Phone number lookup
+• 🚗 RTO Info - Vehicle information  
+• 🏦 IFSC Info - Bank details
+• ❓ Help - Usage guide
+        """
+        await context.bot.send_message(
+            chat_id=user_id,
+            text=welcome_text,
+            reply_markup=get_main_keyboard(),
+            parse_mode=ParseMode.MARKDOWN
+        )
     else:
         await query.edit_message_text(
-            f"{Style.ERROR} *Not Joined Yet* - Please join the channel first.",
+            f"{Style.ERROR} *Not Joined Yet* - Please join the channel first and then click 'I've Joined'.",
             parse_mode=ParseMode.MARKDOWN
         )
 
@@ -419,7 +462,8 @@ async def phone_search_handler(update: Update, context: CallbackContext) -> None
         return
     
     await update.message.reply_text(
-        f"{Style.PHONE} *Phone Search*\n\nSend 10-digit mobile number:",
+        f"{Style.PHONE} *PHONE NUMBER LOOKUP*\n\nPlease send the 10-digit mobile number:\n\nExample: `7044165702`",
+        reply_markup=get_search_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
     context.user_data['expecting_phone'] = True
@@ -434,7 +478,8 @@ async def vehicle_search_handler(update: Update, context: CallbackContext) -> No
         return
     
     await update.message.reply_text(
-        f"{Style.CAR} *Vehicle Search*\n\nSend vehicle number:",
+        f"{Style.CAR} *VEHICLE INFORMATION LOOKUP*\n\nPlease send the vehicle registration number:\n\nExample: `UP32AB1234`",
+        reply_markup=get_search_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
     context.user_data['expecting_vehicle'] = True
@@ -449,7 +494,8 @@ async def ifsc_search_handler(update: Update, context: CallbackContext) -> None:
         return
     
     await update.message.reply_text(
-        f"{Style.BANK} *IFSC Search*\n\nSend IFSC code:",
+        f"{Style.BANK} *IFSC CODE LOOKUP*\n\nPlease send the IFSC code:\n\nExample: `SBIN0003010`",
+        reply_markup=get_search_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
     context.user_data['expecting_ifsc'] = True
@@ -464,47 +510,173 @@ def clean_phone_number(number: str) -> str:
         return cleaned[2:]
     return cleaned
 
+def fetch_phone_info(phone_number: str) -> dict:
+    """Fetch phone information from API"""
+    try:
+        response = requests.get(f"{PHONE_API_URL}{phone_number}", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        return {"error": "API request failed"}
+    except Exception as e:
+        return {"error": f"API error: {str(e)}"}
+
+def fetch_vehicle_info(vehicle_number: str) -> dict:
+    """Fetch vehicle information from APIs"""
+    try:
+        # Try first API
+        response1 = requests.get(f"{VEHICLE_API1_URL}{vehicle_number}", timeout=10)
+        if response1.status_code == 200:
+            return response1.json()
+        
+        # Try second API if first fails
+        response2 = requests.get(f"{VEHICLE_API2_URL}{vehicle_number}", timeout=10)
+        if response2.status_code == 200:
+            return response2.json()
+            
+        return {"error": "Both vehicle APIs failed"}
+    except Exception as e:
+        return {"error": f"Vehicle API error: {str(e)}"}
+
+def fetch_ifsc_info(ifsc_code: str) -> dict:
+    """Fetch IFSC information from API"""
+    try:
+        response = requests.get(f"{IFSC_API_URL}{ifsc_code}", timeout=10)
+        if response.status_code == 200:
+            return response.json()
+        return {"error": "IFSC not found or invalid"}
+    except Exception as e:
+        return {"error": f"IFSC API error: {str(e)}"}
+
 async def handle_phone_number(update: Update, context: CallbackContext) -> None:
-    """Handle phone number input"""
+    """Handle phone number input with actual API integration"""
     number_input = update.message.text
     clean_number = clean_phone_number(number_input)
     
     if len(clean_number) != 10:
         await update.message.reply_text(
-            f"{Style.ERROR} Invalid number! Send 10-digit number.",
+            f"{Style.ERROR} *Invalid Number Format*\n\nPlease send a valid 10-digit mobile number.\nExample: `7044165702`",
             reply_markup=get_main_keyboard(),
             parse_mode=ParseMode.MARKDOWN
         )
         return
     
-    # Simple response for testing
-    await update.message.reply_text(
-        f"{Style.PHONE} Processing number: {clean_number}\n\n(API integration active)",
-        reply_markup=get_main_keyboard(),
+    processing_msg = await update.message.reply_text(
+        f"{Style.LOADING} Searching for phone number: `{clean_number}`...",
         parse_mode=ParseMode.MARKDOWN
     )
+    
+    # Fetch actual data from API
+    phone_data = fetch_phone_info(clean_number)
+    
+    if "error" in phone_data:
+        await processing_msg.edit_text(
+            f"{Style.ERROR} *Search Failed*\n\nNumber: `{clean_number}`\nError: {phone_data['error']}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        # Format the response
+        response_text = f"""
+{Style.PHONE} *PHONE INFORMATION FOUND*
+
+📱 *Number:* `{clean_number}`
+🏢 *Carrier:* {phone_data.get('carrier', 'N/A')}
+📍 *Location:* {phone_data.get('location', 'N/A')}
+📞 *Type:* {phone_data.get('type', 'N/A')}
+🌍 *Country:* {phone_data.get('country', 'India')}
+
+📊 *Additional Details:*
+• Status: {phone_data.get('status', 'Active')}
+• Ported: {phone_data.get('ported', 'N/A')}
+
+*Data Source:* External API
+        """
+        await processing_msg.edit_text(response_text, parse_mode=ParseMode.MARKDOWN)
+    
     context.user_data['expecting_phone'] = False
 
 async def handle_vehicle_search(update: Update, context: CallbackContext) -> None:
-    """Handle vehicle search"""
+    """Handle vehicle search with actual API integration"""
     vehicle_input = update.message.text.upper().strip()
     
-    await update.message.reply_text(
-        f"{Style.CAR} Processing vehicle: {vehicle_input}\n\n(API integration active)",
-        reply_markup=get_main_keyboard(),
+    processing_msg = await update.message.reply_text(
+        f"{Style.LOADING} Searching for vehicle: `{vehicle_input}`...",
         parse_mode=ParseMode.MARKDOWN
     )
+    
+    # Fetch actual data from API
+    vehicle_data = fetch_vehicle_info(vehicle_input)
+    
+    if "error" in vehicle_data:
+        await processing_msg.edit_text(
+            f"{Style.ERROR} *Search Failed*\n\nVehicle: `{vehicle_input}`\nError: {vehicle_data['error']}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        # Format the response
+        response_text = f"""
+{Style.CAR} *VEHICLE INFORMATION FOUND*
+
+🚗 *Registration:* `{vehicle_input}`
+👤 *Owner:* {vehicle_data.get('owner_name', 'N/A')}
+📇 *Father/Husband:* {vehicle_data.get('father_name', 'N/A')}
+📍 *Address:* {vehicle_data.get('address', 'N/A')}
+
+🚘 *Vehicle Details:*
+• Make: {vehicle_data.get('make', 'N/A')}
+• Model: {vehicle_data.get('model', 'N/A')}
+• Year: {vehicle_data.get('year', 'N/A')}
+• Fuel: {vehicle_data.get('fuel_type', 'N/A')}
+
+📄 *Registration Info:*
+• RTO: {vehicle_data.get('rto', 'N/A')}
+• Date: {vehicle_data.get('reg_date', 'N/A')}
+
+*Data Source:* External API
+        """
+        await processing_msg.edit_text(response_text, parse_mode=ParseMode.MARKDOWN)
+    
     context.user_data['expecting_vehicle'] = False
 
 async def handle_ifsc_search(update: Update, context: CallbackContext) -> None:
-    """Handle IFSC search"""
+    """Handle IFSC search with actual API integration"""
     ifsc_input = update.message.text.upper().strip()
     
-    await update.message.reply_text(
-        f"{Style.BANK} Processing IFSC: {ifsc_input}\n\n(API integration active)",
-        reply_markup=get_main_keyboard(),
+    processing_msg = await update.message.reply_text(
+        f"{Style.LOADING} Searching for IFSC: `{ifsc_input}`...",
         parse_mode=ParseMode.MARKDOWN
     )
+    
+    # Fetch actual data from API
+    ifsc_data = fetch_ifsc_info(ifsc_input)
+    
+    if "error" in ifsc_data:
+        await processing_msg.edit_text(
+            f"{Style.ERROR} *Search Failed*\n\nIFSC: `{ifsc_input}`\nError: {ifsc_data['error']}",
+            parse_mode=ParseMode.MARKDOWN
+        )
+    else:
+        # Format the response
+        response_text = f"""
+{Style.BANK} *BANK INFORMATION FOUND*
+
+🏦 *Bank:* {ifsc_data.get('BANK', 'N/A')}
+🏢 *Branch:* {ifsc_data.get('BRANCH', 'N/A')}
+📍 *Address:* {ifsc_data.get('ADDRESS', 'N/A')}
+📞 *Contact:* {ifsc_data.get('CONTACT', 'N/A')}
+🏙️ *City:* {ifsc_data.get('CITY', 'N/A')}
+📮 *District:* {ifsc_data.get('DISTRICT', 'N/A')}
+🏛️ *State:* {ifsc_data.get('STATE', 'N/A')')
+
+💳 *Services:*
+• RTGS: {ifsc_data.get('RTGS', 'No')}
+• NEFT: {ifsc_data.get('NEFT', 'No')}
+• IMPS: {ifsc_data.get('IMPS', 'No')}
+• UPI: {ifsc_data.get('UPI', 'No')}
+
+*Data Source:* Razorpay IFSC API
+        """
+        await processing_msg.edit_text(response_text, parse_mode=ParseMode.MARKDOWN)
+    
     context.user_data['expecting_ifsc'] = False
 
 # Main message handler
@@ -549,6 +721,15 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     elif text == f"{Style.HOME} Main Menu":
         await start(update, context)
         return
+    elif text == f"{Style.PHONE} Phone Search":
+        await phone_search_handler(update, context)
+        return
+    elif text == f"{Style.CAR} Vehicle Search":
+        await vehicle_search_handler(update, context)
+        return
+    elif text == f"{Style.BANK} IFSC Search":
+        await ifsc_search_handler(update, context)
+        return
     
     # Check for expected inputs
     if context.user_data.get('expecting_phone'):
@@ -567,9 +748,19 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
         await handle_phone_number(update, context)
         return
     
+    # Check if it might be a vehicle number (basic pattern)
+    if len(text) >= 8 and len(text) <= 12 and any(c.isalpha() for c in text) and any(c.isdigit() for c in text):
+        await handle_vehicle_search(update, context)
+        return
+    
+    # Check if it might be an IFSC code (typically 11 characters)
+    if len(text) == 11 and text[:4].isalpha() and text[4:].isalnum():
+        await handle_ifsc_search(update, context)
+        return
+    
     # Default response
     await update.message.reply_text(
-        f"{Style.INFO} Use buttons below or send:\n• Phone number\n• Vehicle number\n• IFSC code",
+        f"{Style.INFO} *ZARKO OSINT BOT*\n\nPlease use the buttons below to select your search type:\n\n• 📱 Phone number lookup\n• 🚗 Vehicle information\n• 🏦 Bank IFSC details\n• ❓ Help guide\n• 👨‍💼 Admin panel",
         reply_markup=get_main_keyboard(),
         parse_mode=ParseMode.MARKDOWN
     )
@@ -594,9 +785,10 @@ def main() -> None:
     # Start bot
     print("🚀 Starting Zarko OSINT Bot...")
     print(f"📊 Bot Token: {BOT_TOKEN[:10]}...")
-    print(f"📢 Channel: {REQUIRED_CHANNEL}")
-    print(f"👑 Admins: {ADMIN_USER_IDS}")
-    print("✅ Bot is ready!")
+    print(f"📢 Required Channel: {REQUIRED_CHANNEL}")
+    print(f"👑 Admin Users: {ADMIN_USER_IDS}")
+    print(f"🌐 Keep-alive server running on port {KEEP_ALIVE_PORT}")
+    print("✅ Bot is ready and polling for messages...")
     
     try:
         application.run_polling(drop_pending_updates=True)
