@@ -16,7 +16,7 @@ VEHICLE_API2_URL = "https://caller.hackershub.shop/info.php?type=address&registr
 IFSC_API_URL = "https://ifsc.razorpay.com/"
 
 # Channel and Admin Configuration
-REQUIRED_CHANNEL = "@zarkoworld"  # Channel that users must join
+REQUIRED_CHANNEL = "zarkoworld"  # Channel that users must join
 ADMIN_USER_IDS = [7975903577, 7708009915]  # Replace with actual admin user IDs
 
 # Keep Alive Server Configuration
@@ -1775,4 +1775,5 @@ def main() -> None:
         print("⏹️ All services stopped.")
 
 if __name__ == '__main__':
+
     main()
