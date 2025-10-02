@@ -9,7 +9,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.constants import ParseMode
 
 # Bot Configuration
-BOT_TOKEN = "8116705267:AAHVoyKFuX2Jrt0jHrP4nyIeq-YKvbSjCQs"
+BOT_TOKEN = "8116705267:AAFYOj0Rv-dCTCS-vnFsBq5PoKSfNg2X-_8"
 PHONE_API_URL = "https://decryptkarnrwalebkl.wasmer.app/?key=lodalelobaby&term="
 VEHICLE_API1_URL = "https://revangevichelinfo.vercel.app/api/rc?number="
 VEHICLE_API2_URL = "https://caller.hackershub.shop/info.php?type=address&registration="
@@ -1796,4 +1796,5 @@ def main() -> None:
         print("⏹️ All services stopped.")
 
 if __name__ == '__main__':
+
     main()
