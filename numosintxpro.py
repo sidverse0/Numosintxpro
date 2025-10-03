@@ -1407,7 +1407,7 @@ def format_ifsc_results(ifsc_code, data):
 {Style.IMPS} *IMPS:* {format_bool(bank_data.get('IMPS', False))}
 {Style.SWIFT} *SWIFT:* `{format_value(bank_data.get('SWIFT'))}`
 
-{Style.SHIELD} *Data Source:* Razorpay IFSC API
+{Style.SHIELD} *Data Source:* Zarko API
 {Style.INFO} *Note:* Information provided by official banking sources
     """
     
@@ -1745,3 +1745,4 @@ def main() -> None:
 if __name__ == '__main__':
 
     main()
+
